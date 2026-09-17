@@ -5,12 +5,12 @@
 # device.py's, and the pointer is in the film, since what it is over is the
 # point.
 #
-#   ./pixel_grid            on ~/Downloads/0-winding-road.webp
+#   ./pixel_grid            on images/0-winding-road.webp
 #   ./pixel_grid FILE X Y   on another picture, zooming into pixel X, Y
 
 . "$(dirname "$0")/lib.sh"
 
-file=${1:-$HOME/Downloads/0-winding-road.webp}
+file=${1:-$ROOT/images/0-winding-road.webp}
 x=${2:-957}
 y=${3:-2172}
 set -- $(magick identify -format '%w %h' "$file")

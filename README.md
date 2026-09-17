@@ -11,10 +11,12 @@ is the script.
 | `main_screenshot` | a photograph zoomed in three steps and panned to the summit, with the minimap |
 | `animated` | a GIF opened paused, then played through once with the transport bar |
 | `pixel_grid` | the grid on, the wheel rolled over the stag until the grid is at single pixels, then Space |
+| `pixel_copy` | the grid on and the wheel rolled into the mountain, the dot at the head of the readout hovered and pressed, Hex chosen, and Ctrl+. over the picture |
 | `info` | an elevation model in turbo with the information panel up, at 50% |
 | `compare` | the three rasters of one mountain flipped through, the wheel rolled into the crater on the way |
 | `false_color` | the hillshade held over the crater, `r` pressed through the four color maps |
 | `fuzzy_finder` | Ctrl+P over a directory of several hundred pictures: one chosen by a few letters, one by its number |
+| `themes` | the photograph with the information panel open, on Tokyo Night, then on Gruvbox once the desk is switched to it, the two stills flipped between every two seconds |
 
 ```sh
 ./main_screenshot                       # ~/git/gamut/user-docs/screenshots/main_screenshot.jpg
@@ -30,9 +32,9 @@ Three things are the environment's to say, each with a default:
 | `SCREENSHOTS` | where the pictures go | `~/git/gamut/user-docs/screenshots` |
 | `FILMS` | where the recordings go before they are GIFs | `films/` here, ignored by git |
 
-The pictures they open are not in this repository: `~/git/mora`,
-`~/Downloads/stellated-dodecahedron.gif`, `~/Downloads/0-winding-road.webp`
-and a directory of bird plates. Each script takes another path as its first
+The pictures they open are in `images/`: the four rasters of one mountain
+in `images/mora`, several hundred bird plates in `images/birds`, and the
+GIF and the stag beside them. Each script takes another path as its first
 argument.
 
 ## What a script does
@@ -42,13 +44,20 @@ The compositor has to do three things the program cannot do for itself:
 
 - **Leave the window at the size asked for.** `--size` is a request, and a
   tiling layout ignores it. `open` starts the program through `hl.exec_cmd`
-  with a rule set that floats and centers the window at exactly that size,
-  and at full opacity: Omarchy's default rules make every window slightly
-  translucent, which would blend whatever is behind it into the picture.
-- **Say where the window is.** `hyprctl clients` reports the window's
+  with a rule set that floats the window at exactly that size, and at full
+  opacity: Omarchy's default rules make every window slightly translucent,
+  which would blend whatever is behind it into the picture.
+- **Put it on a device pixel.** `hyprctl clients` reports the window's
   position and size in logical pixels, and `grim -g` captures that rectangle
   at the monitor's own scale. On a monitor at scale 1.6 a 1000×600 window
-  comes out as a 1600×960 image.
+  comes out as a 1600×960 image, but only every fifth logical position is a
+  whole device pixel, and a window centered under the bar starts at device
+  row 620.8: the first captured row is then Hyprland's border, which is blue
+  while the window has focus, gray while it does not, and a half-second fade
+  between whenever the pointer leaves and comes back. In a film that row
+  flickers. `placement` centers the window as the `center` rule would and
+  then moves it to the nearest position that is whole at the monitor's
+  scale, so every captured pixel is the window's own.
 - **Type into it.** `wtype` presses keys on a virtual keyboard, and they go
   to whichever window has focus. Focus follows the pointer, so the pointer
   is put in the window before anything is typed.
@@ -91,9 +100,17 @@ held button and motion, then taken away again. It uses nothing outside
 Python's standard library; the ioctl numbers and the event record are
 written out from the kernel's own headers. Omarchy gives the user write
 access to `/dev/uinput` through an ACL, which is what makes this possible
-without root. `wheel` and `drag` in `lib.sh` call it, and `record NAME
-cursor` keeps the pointer in the film for a recording where the pointer is
-the point.
+without root. `wheel`, `drag` and `click` in `lib.sh` call it, and `record
+NAME cursor` keeps the pointer in the film for a recording where the pointer
+is the point.
+
+`glide` moves the pointer through it too, for a film where the pointer's
+way to a button is part of the picture and `cursor`'s leap out of the
+window and back is not, and for a tooltip, which the program shows only
+over a pointer that arrived by motion. The compositor accelerates motion
+from a mouse, so a move of the whole distance lands past its mark;
+`device.py glide` asks Hyprland where the pointer got to and moves what is
+left, until it is there.
 
 It is a keyboard too, for the bindings `wtype` cannot reach. A binding in
 gamut's `app/input.rs` is matched either by what the key says (`Char("+")`)
@@ -126,6 +143,14 @@ pressed, and loops where the file does. `cut` stops the recorder with
 `gif` is ffmpeg's two-pass GIF — a palette from the whole clip, then the
 frames dithered against it, each frame only the rectangle that changed —
 at 25 frames a second and 800 pixels wide.
+
+`themes` has no recording. Its two frames are `still`, which is `shoot`
+losslessly into `$FILMS`, and `flipbook` puts them together with
+ImageMagick, each held for the seconds given, at the window's own size.
+The window is opened once: gamut watches the desktop's palette file and
+retints itself when Omarchy rewrites it, so the second still is the same
+window a few seconds later. The script switches the desk's theme with
+`omarchy-theme-set` and puts it back on whatever it was, however it ends.
 
 ## What the scripts are not
 

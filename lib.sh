@@ -10,7 +10,7 @@
 #
 # A script sources this file, then:
 #
-#   open 1200 800 ~/git/mora     the window, focused, with its first file shown
+#   open 1200 800 images/mora    the window, focused, with its first file shown
 #   keys plus plus plus Up       the keys to press, one argument each
 #   settle                       wait for a pan or zoom to land
 #   shoot main_screenshot.jpg    into $SCREENSHOTS
@@ -18,7 +18,9 @@
 #
 # or, for a recording, `record x.mp4` and `cut` around the keys, and
 # `gif "$film" x.gif` afterwards. The recording is gpu-screen-recorder's,
-# into $FILMS, and the GIF is ffmpeg's, into $SCREENSHOTS.
+# into $FILMS, and the GIF is ffmpeg's, into $SCREENSHOTS. A GIF that
+# flips between stills is `still a.png`, `still b.png`, and
+# `flipbook x.gif 2 "$a" "$b"`.
 #
 # Three things are the environment's to say, each with a default:
 #
@@ -81,8 +83,9 @@ open() {
     for path; do
         command="$command $(shell_quote "$path")"
     done
+    set -- $(placement "$width" "$height")
     hyprctl eval "hl.exec_cmd($(lua_quote "$command"), {
-        float = true, size = \"$width $height\", center = true, opacity = \"1 1\",
+        float = true, size = \"$width $height\", move = { \"$1\", \"$2\" }, opacity = \"1 1\",
     })" >/dev/null
 
     # The new window is the one that was not there before.
@@ -102,6 +105,42 @@ open() {
     # would otherwise land in whatever it was over.
     park
     sleep 0.3
+}
+
+# Where on the focused monitor a W by H window goes, in logical pixels
+# from the monitor's corner: centered in what the bars leave, as the
+# `center` rule would put it, then moved to the nearest logical pixel that
+# is also a whole device pixel.
+#
+# On a monitor at scale 1.6 a logical pixel is 1.6 device pixels, and only
+# every fifth position lands on a whole one. Centered under a 26-pixel bar,
+# a 600-high window starts at device row 620.8, and both grim and the
+# recorder then start their capture on row 620, which is not the window
+# but Hyprland's border around it: blue while the window has focus,
+# translucent gray while it does not, and half a second of fade between,
+# so it changes color every time the pointer goes out and comes back. The
+# recorder's is a full row of it, and the GIF, which builds its palette
+# from what changes between frames, makes that row flicker.
+placement() {
+    hyprctl monitors -j | jq -r '.[] | select(.focused) |
+        "\(.width) \(.height) \(.scale) \(.reserved | join(" "))"' |
+    awk -v w="$1" -v h="$2" '
+        # The whole logical pixel nearest P at which SCALE times the
+        # pixel is whole too.
+        function aligned(p, scale,   d, sign, q, f) {
+            for (d = 0; d <= 50; d++)
+                for (sign = 1; sign >= -1; sign -= 2) {
+                    q = int(p + 0.5) + sign * d
+                    f = q * scale - int(q * scale + 0.5)
+                    if (f < 1e-6 && f > -1e-6) return q
+                }
+            return int(p + 0.5)
+        }
+        # width height scale, then the reserved left top right bottom.
+        {
+            print aligned($4 + ($1 / $3 - $4 - $6 - w) / 2, $3),
+                  aligned($5 + ($2 / $3 - $5 - $7 - h) / 2, $3)
+        }'
 }
 
 # Wait for the file on its way to be on screen: the title says "loading"
@@ -148,6 +187,18 @@ warp() {
     hyprctl eval "hl.dispatch(hl.dsp.cursor.move({ x = $1, y = $2 }))" >/dev/null
 }
 
+# Move the pointer to a point in the layout the way a hand would: as
+# motion, from wherever it is, through device.py. For a film with the
+# pointer in it, where `cursor` would be seen to jump out of the window and
+# back; and for a tooltip, which wants the pointer to have arrived rather
+# than appeared. Only for a point inside the window, which keeps the
+# keyboard throughout.
+glide() {
+    CURSOR_X=$1
+    CURSOR_Y=$2
+    python3 "$ROOT/device.py" glide "$1" "$2"
+}
+
 focused() {
     [ "$(hyprctl activewindow -j | jq -r .address)" = "$WINDOW" ]
 }
@@ -181,14 +232,19 @@ scale() {
 }
 
 # Turn the wheel N notches under the pointer, positive away from the hand,
-# which zooms in about it; and drag the left button DX, DY logical pixels
-# from where the pointer is. Both are a device of our own: see device.py.
+# which zooms in about it; drag the left button DX, DY logical pixels from
+# where the pointer is; and click the left button where the pointer is. All
+# three are a device of our own: see device.py.
 wheel() {
     python3 "$ROOT/device.py" wheel "$1"
 }
 
 drag() {
     python3 "$ROOT/device.py" drag "$1" "$2"
+}
+
+click() {
+    python3 "$ROOT/device.py" click
 }
 
 # Press a key by its position rather than by what it says — `shift+2` for
@@ -315,6 +371,29 @@ gif() {
     ffmpeg -v error -y $window -i "$film" \
         -filter_complex "$filters,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
         -loop 0 "$out"
+    echo "$out"
+}
+
+# Capture the window's rectangle losslessly, as a PNG under the name given
+# in $FILMS: a frame for a GIF put together from stills rather than cut
+# from a recording. `flipbook` makes the GIF.
+still() {
+    park
+    set -- "$FILMS/$1" $(window geometry)
+    mkdir -p "$FILMS"
+    grim -g "$2,$3 ${4}x$5" "$1"
+    echo "$1"
+}
+
+# The stills given, each held for HOLD seconds, as a GIF under the name
+# given in $SCREENSHOTS, at the stills' own size.
+#
+#   flipbook themes.gif 2 "$first" "$second"
+flipbook() {
+    out=$SCREENSHOTS/$1
+    hold=$2
+    shift 2
+    magick -delay "${hold}x1" -loop 0 "$@" "$out"
     echo "$out"
 }
 

@@ -1,0 +1,47 @@
+#!/bin/sh
+# The README's themes: a photograph in a 1000x600 window with the
+# information panel open, photographed on Tokyo Night, then again on
+# Gruvbox once the desk has been switched to it, and the two stills put
+# together as a GIF that flips between them every two seconds. The window
+# is not reopened between the two: gamut watches the desktop's theme and
+# retints itself when it changes. The desk is put back on whatever theme it
+# was on, however the script ends.
+#
+#   ./themes                on images/mora/mora.jpg
+#   ./themes FILE           on another picture
+#   ./themes FILE A B       between themes A and B, named as `omarchy theme list` names them
+
+. "$(dirname "$0")/lib.sh"
+
+file=${1:-$ROOT/images/mora/mora.jpg}
+first=${2:-Tokyo Night}
+second=${3:-Gruvbox}
+
+command -v omarchy-theme-set >/dev/null || { echo "omarchy-theme-set is not installed" >&2; exit 1; }
+
+# Put the desk on the theme named, unless it is there already. Names are
+# compared as Omarchy stores them, lowercase and dashed.
+theme() {
+    name=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+    [ "$(cat "$HOME/.local/state/omarchy/current/theme.name")" = "$name" ] && return
+    omarchy-theme-set "$1" >/dev/null
+    # The change reaches the window through a watch that fires once the
+    # palette file has held still for a while; the frame after that is
+    # what is wanted.
+    sleep 1
+}
+
+was=$(omarchy-theme-current)
+restore() {
+    theme "$was"
+    cleanup
+}
+trap restore EXIT
+
+theme "$first"
+open 1000 600 --info "$file"
+a=$(still "themes-1.png")
+theme "$second"
+b=$(still "themes-2.png")
+close
+flipbook "themes.gif" 2 "$a" "$b"

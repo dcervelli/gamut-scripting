@@ -2,12 +2,12 @@
 # The README's information panel: an elevation model in a 1000x600 window,
 # in turbo false color, with the panel open and the picture at 50%.
 #
-#   ./info            on ~/git/mora/mora_dem_12.5m_utm10.tif
+#   ./info            on images/mora/mora_dem_12.5m_utm10.tif
 #   ./info FILE       on another file
 
 . "$(dirname "$0")/lib.sh"
 
-open 1000 600 --colormap turbo --info "${1:-$HOME/git/mora/mora_dem_12.5m_utm10.tif}"
+open 1000 600 --colormap turbo --info "${1:-$ROOT/images/mora/mora_dem_12.5m_utm10.tif}"
 press shift+2
 settle
 shoot "info.jpg"

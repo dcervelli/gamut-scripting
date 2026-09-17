@@ -3,12 +3,12 @@
 # 1000x600 window, Ctrl+P, a few letters typed and one chosen; then Ctrl+P
 # again and a file asked for by its number.
 #
-#   ./fuzzy_finder            on ~/git/fugleramme/assets/artwork/classic/birds
+#   ./fuzzy_finder            on images/birds
 #   ./fuzzy_finder DIR        on another directory
 
 . "$(dirname "$0")/lib.sh"
 
-open 1000 600 "${1:-$HOME/git/fugleramme/assets/artwork/classic/birds}"
+open 1000 600 "${1:-$ROOT/images/birds}"
 
 record "fuzzy_finder.mp4"
 started=$(since_record)

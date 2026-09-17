@@ -4,12 +4,12 @@
 # The film is cut to one loop of the file from the moment play was pressed,
 # so the GIF made from it loops where the file does.
 #
-#   ./animated            on ~/Downloads/stellated-dodecahedron.gif
+#   ./animated            on images/stellated-dodecahedron.gif
 #   ./animated FILE       on another animation
 
 . "$(dirname "$0")/lib.sh"
 
-file=${1:-$HOME/Downloads/stellated-dodecahedron.gif}
+file=${1:-$ROOT/images/stellated-dodecahedron.gif}
 
 # One loop, in seconds: the frame delays are in hundredths.
 loop=$(magick identify -format '%T\n' "$file" | awk '{ s += $1 } END { print s / 100 }')

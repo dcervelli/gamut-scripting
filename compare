@@ -4,12 +4,12 @@
 # shaded relief — the wheel rolled over the crater to about 100% on the
 # third, and the flip back; the files are of a size, so the zoom follows.
 #
-#   ./compare            on ~/git/mora
+#   ./compare            on images/mora
 #   ./compare DIR X Y    on another directory, zooming into pixel X, Y of its second file
 
 . "$(dirname "$0")/lib.sh"
 
-dir=${1:-$HOME/git/mora}
+dir=${1:-$ROOT/images/mora}
 x=${2:-2340}
 y=${3:-2260}
 

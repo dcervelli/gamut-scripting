@@ -4,12 +4,12 @@
 # four color maps — gray, viridis, magma, turbo — a second on each. The
 # zoom is done before the film starts; the film is the colors.
 #
-#   ./false_color            on ~/git/mora
+#   ./false_color            on images/mora
 #   ./false_color DIR X Y    on another directory, zooming into pixel X, Y of its third file
 
 . "$(dirname "$0")/lib.sh"
 
-dir=${1:-$HOME/git/mora}
+dir=${1:-$ROOT/images/mora}
 x=${2:-2340}
 y=${3:-2260}
 

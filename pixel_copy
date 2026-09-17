@@ -1,0 +1,55 @@
+#!/bin/sh
+# The README's pixel readout: a photograph in a 1000x600 window with the
+# grid on, the wheel turned over a spot on the mountain until single pixels
+# are squares, then the pointer taken down to the dot at the head of the
+# readout and held there for its tooltip, the dot pressed, Hex chosen from
+# the menu it opens, and the pointer brought back over the picture for
+# Ctrl+. to copy the pixel under it. The pointer is in the film, since
+# where it goes is the point, and it moves as a hand would, through
+# device.py.
+#
+#   ./pixel_copy            on images/mora/mora.jpg
+#   ./pixel_copy FILE X Y   on another picture, zooming into pixel X, Y
+
+. "$(dirname "$0")/lib.sh"
+
+file=${1:-$ROOT/images/mora/mora.jpg}
+x=${2:-1250}
+y=${3:-660}
+set -- $(magick identify -format '%w %h' "$file")
+
+open 1000 600 "$file"
+keys g
+record "pixel_copy.mp4" cursor
+started=$(since_record)
+sleep 0.3
+cursor $(fitted "$1" "$2" "$x" "$y")
+sleep 0.3
+# Fourteen notches from a fit of 43% is 982%, where the grid is at 10 px.
+wheel 14
+sleep 0.5
+
+set -- $(window geometry)
+# The dot is the second button of the bottom bar, after the grid toggle
+# and its reading: 86 logical pixels in from the left edge with the reading
+# at "10 px", on the bar's centerline.
+dot_x=$(($1 + 86))
+dot_y=$(($2 + $4 - 15))
+glide "$dot_x" "$dot_y"
+sleep 3
+click
+sleep 1
+# The menu stands over the dot, and Hex is the first of its three cells:
+# its middle is 41 right of the dot's and 46 up.
+glide $((dot_x + 41)) $((dot_y - 46))
+sleep 0.8
+click
+sleep 0.8
+glide $(($1 + $3 / 2)) $(($2 + $4 / 2))
+sleep 0.8
+press ctrl+dot
+# The toast says what was copied; long enough to read it.
+sleep 2
+film=$(cut)
+close
+gif "$film" "pixel_copy.gif" 800 "$started"

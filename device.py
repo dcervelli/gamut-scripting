@@ -16,6 +16,7 @@ the second digit and not by what it says — never sees the key it wants.
 A key from here is the real keycode, read under the real keymap.
 
     device.py wheel N          N notches: positive is away from the hand, which zooms in
+    device.py glide X Y        the pointer moved, with no button held, until it is at X, Y
     device.py drag DX DY       the left button held while the pointer moves DX, DY
     device.py click            the left button pressed and released
     device.py key CHORD        a key by its position, with modifiers: 2, shift+2, ctrl+shift+c
@@ -25,8 +26,10 @@ ACL, and `getfacl /dev/uinput` says whether it has.
 """
 
 import fcntl
+import json
 import os
 import struct
+import subprocess
 import sys
 import time
 
@@ -117,6 +120,23 @@ class Device:
             gone = to
             time.sleep(0.008)
 
+    def glide(self, x, y):
+        # Motion from a mouse is accelerated by the compositor, so a move of
+        # the whole distance lands past its mark; ask where the pointer got
+        # to and move what is left, which is a smaller and so a slower move,
+        # until it is there. The only thing here that knows the pointer's
+        # place is Hyprland.
+        for _ in range(8):
+            at = subprocess.run(
+                ["hyprctl", "cursorpos", "-j"], capture_output=True, text=True, check=True
+            ).stdout
+            at = json.loads(at)
+            dx, dy = x - round(at["x"]), y - round(at["y"])
+            if dx == 0 and dy == 0:
+                return
+            self.move(dx, dy)
+            time.sleep(0.05)
+
     def button(self, down):
         self.emit(EV_KEY, BTN_LEFT, 1 if down else 0)
         self.sync()
@@ -154,6 +174,8 @@ def main(argv):
         match argv[1:]:
             case ["wheel", notches]:
                 device.wheel(int(notches))
+            case ["glide", x, y]:
+                device.glide(int(x), int(y))
             case ["drag", dx, dy]:
                 device.drag(int(dx), int(dy))
             case ["click"]:
