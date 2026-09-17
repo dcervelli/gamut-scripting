@@ -1,0 +1,15 @@
+#!/bin/sh
+# The README's first picture: a photograph in a 1000x600 window, zoomed in
+# three steps and panned five steps up to the summit, with the minimap
+# showing where in the picture that is.
+#
+#   ./main_screenshot            on ~/git/mora
+#   ./main_screenshot DIR        on the images in DIR
+
+. "$(dirname "$0")/lib.sh"
+
+open 1000 600 "${1:-$HOME/git/mora}"
+keys plus plus plus Up Up Up Up Up
+settle
+shoot "main_screenshot.jpg"
+close
