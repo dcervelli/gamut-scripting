@@ -1,0 +1,73 @@
+#!/bin/sh
+# The README's file watch: a program that renders the Mandelbrot set to a
+# PNG, zooming in a step every second, and a 1000x600 window open on that
+# PNG for ten seconds, taking each new frame as it lands. Three seconds in
+# the window is zoomed four steps into the middle, where the renderer is
+# heading, and panned once around it, and each frame the renderer writes
+# meanwhile arrives under the same pan and zoom; then Space fits the whole
+# picture again for the rest. The program is the Rust crate in
+# mandelbrot-zoom/, which writes each frame to a temporary file and
+# renames it over the last, so the window never sees a half-written one.
+#
+# The renderer is started before the window and held after its first
+# frame, then let go once the recording is running, so that every take
+# starts on the whole set and zooms from there.
+#
+#   ./mandelbrot
+
+. "$(dirname "$0")/lib.sh"
+
+MANDELBROT=${MANDELBROT:-$ROOT/mandelbrot-zoom/target/release/mandelbrot}
+
+if [ ! -x "$MANDELBROT" ]; then
+    command -v cargo >/dev/null || { echo "no renderer at $MANDELBROT and no cargo to build one; set MANDELBROT" >&2; exit 1; }
+    cargo build --release --quiet --manifest-path "$ROOT/mandelbrot-zoom/Cargo.toml"
+fi
+
+# The renderer is ours to stop, however the script ends. It is continued
+# first: a stopped process does not act on the signal until it is.
+RENDERER=
+stop() {
+    [ -z "$RENDERER" ] || { kill -CONT "$RENDERER"; kill "$RENDERER"; } 2>/dev/null || true
+    cleanup
+}
+trap stop EXIT
+
+png=$FILMS/mandelbrot-zoom.png
+mkdir -p "$FILMS"
+rm -f "$png"
+"$MANDELBROT" "$png" >/dev/null &
+RENDERER=$!
+for _ in $(seq 100); do
+    [ -s "$png" ] && break
+    kill -0 "$RENDERER" 2>/dev/null || { echo "the renderer quit before its first frame" >&2; exit 1; }
+    sleep 0.1
+done
+[ -s "$png" ] || { echo "the renderer never wrote a frame" >&2; exit 1; }
+kill -STOP "$RENDERER"
+
+open 1000 600 "$png"
+record "mandelbrot.mp4"
+kill -CONT "$RENDERER"
+sleep 3
+# Four steps of 1.25 from the fit of 84% is 205%. A step at a time, so
+# that each zoom is seen to land.
+for _ in 1 2 3 4; do
+    keys plus
+    sleep 0.25
+done
+sleep 0.5
+# A turn around the middle, 64 image pixels a step, back to where it began.
+for key in Left Up Right Right Down Down Left Up; do
+    keys "$key"
+    sleep 0.3
+done
+sleep 1
+keys space
+# The rest of the ten seconds, watching at fit again.
+sleep "$(awk -v s="$(since_record)" 'BEGIN { print (s < 10) ? 10 - s : 0 }')"
+film=$(cut)
+close
+kill "$RENDERER"
+RENDERER=
+gif "$film" "mandelbrot.gif" 800

@@ -17,6 +17,7 @@ is the script.
 | `false_color` | the hillshade held over the crater, `r` pressed through the four color maps |
 | `fuzzy_finder` | Ctrl+P over a directory of several hundred pictures: one chosen by a few letters, one by its number |
 | `themes` | the photograph with the information panel open, on Tokyo Night, then on Gruvbox once the desk is switched to it, the two stills flipped between every two seconds |
+| `mandelbrot` | a PNG that a program rewrites every second, one step further into the Mandelbrot set, watched for ten seconds: zoomed four steps into the middle and panned once around it partway, then Space |
 
 ```sh
 ./main_screenshot                       # ~/git/gamut/user-docs/screenshots/main_screenshot.jpg
@@ -35,7 +36,10 @@ Three things are the environment's to say, each with a default:
 The pictures they open are in `images/`: the four rasters of one mountain
 in `images/mora`, several hundred bird plates in `images/birds`, and the
 GIF and the stag beside them. Each script takes another path as its first
-argument.
+argument. `mandelbrot` opens no picture of ours: the program that draws its
+picture is the Rust crate in [`mandelbrot-zoom/`](mandelbrot-zoom/), which
+the script builds if `cargo build --release` has not been run there
+already, or `MANDELBROT` names another binary.
 
 ## What a script does
 
@@ -143,6 +147,21 @@ pressed, and loops where the file does. `cut` stops the recorder with
 `gif` is ffmpeg's two-pass GIF — a palette from the whole clip, then the
 frames dithered against it, each frame only the rectangle that changed —
 at 25 frames a second and 800 pixels wide.
+
+`mandelbrot` is a recording of the file under the window changing and the
+window following, first as it was opened and then under a pan and zoom of
+its own: three seconds in, `+` four times and a turn of the arrows around
+the middle, which is where the renderer is heading, and each frame that
+lands meanwhile comes up under the same view, since a file of the same
+size keeps it; then Space fits the whole picture again. The renderer writes a 1024×1024 frame into
+`$FILMS` every second, each to a temporary file renamed over the last, so
+the window's watch — a `stat` every quarter second, acted on once the file
+has held still for one — never reads a half-written frame. It draws its
+first frame in milliseconds and the window takes a second or so to open,
+so the script holds the renderer with `SIGSTOP` after that first frame and
+lets it go with `SIGCONT` once the recorder is running, and every take
+begins on the whole set. Ten seconds is nine steps of the zoom, at 0.8 a
+step.
 
 `themes` has no recording. Its two frames are `still`, which is `shoot`
 losslessly into `$FILMS`, and `flipbook` puts them together with
