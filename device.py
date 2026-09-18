@@ -15,7 +15,8 @@ a binding on a key's position — Shift+2 for 50%, matched by the key being
 the second digit and not by what it says — never sees the key it wants.
 A key from here is the real keycode, read under the real keymap.
 
-    device.py wheel N          N notches: positive is away from the hand, which zooms in
+    device.py wheel N [S]      N notches: positive is away from the hand, which zooms in;
+                               spread evenly over S seconds rather than sent at once
     device.py glide X Y        the pointer moved, with no button held, until it is at X, Y
     device.py drag DX DY       the left button held while the pointer moves DX, DY
     device.py click            the left button pressed and released
@@ -98,13 +99,17 @@ class Device:
     def sync(self):
         self.emit(EV_SYN, SYN_REPORT, 0)
 
-    def wheel(self, notches):
+    def wheel(self, notches, seconds=None):
+        # As fast as a flick unless told how long to take: a slow turn, for
+        # a scroll that is meant to be read on the way down, is the same
+        # notches with the whole time parted out between them.
         step = 1 if notches > 0 else -1
+        pause = 0.05 if seconds is None else seconds / max(1, abs(notches))
         for _ in range(abs(notches)):
             self.emit(EV_REL, REL_WHEEL, step)
             self.emit(EV_REL, REL_WHEEL_HI_RES, step * NOTCH)
             self.sync()
-            time.sleep(0.05)
+            time.sleep(pause)
 
     def move(self, dx, dy):
         # In steps, so that it is a drag rather than a jump: a pointer that
@@ -174,6 +179,8 @@ def main(argv):
         match argv[1:]:
             case ["wheel", notches]:
                 device.wheel(int(notches))
+            case ["wheel", notches, seconds]:
+                device.wheel(int(notches), float(seconds))
             case ["glide", x, y]:
                 device.glide(int(x), int(y))
             case ["drag", dx, dy]:

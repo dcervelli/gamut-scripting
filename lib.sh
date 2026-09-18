@@ -232,11 +232,15 @@ scale() {
 }
 
 # Turn the wheel N notches under the pointer, positive away from the hand,
-# which zooms in about it; drag the left button DX, DY logical pixels from
-# where the pointer is; and click the left button where the pointer is. All
-# three are a device of our own: see device.py.
+# which zooms in about it, all at once or spread over SECONDS; drag the
+# left button DX, DY logical pixels from where the pointer is; and click
+# the left button where the pointer is. All three are a device of our own:
+# see device.py.
+#
+#   wheel 14         a flick
+#   wheel -20 3      a slow turn, for reading what scrolls past
 wheel() {
-    python3 "$ROOT/device.py" wheel "$1"
+    python3 "$ROOT/device.py" wheel "$@"
 }
 
 drag() {
@@ -284,6 +288,13 @@ keys() {
         wtype $held -k "$key" $released
         sleep 0.05
     done
+}
+
+# Hold a key down for SECONDS, named as `keys` names them: `hold w 1` for
+# the clipping paint, which is on the picture only while the key is.
+hold() {
+    keyboard
+    wtype -P "$1" -s "$(awk -v s="$2" 'BEGIN { print int(s * 1000) }')" -p "$1"
 }
 
 # Long enough for a pan or a zoom to reach where it was going: a move takes

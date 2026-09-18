@@ -1,0 +1,54 @@
+#!/bin/sh
+# The README's histogram: a photograph in a 1000x600 window, the histogram
+# button in the right strip pressed, the black handle on the band dragged
+# in from the left and the white handle in from the right, so that the
+# window is narrower than the picture's range and both corners of the plot
+# say how much is being thrown away, then `w` held for a second to paint
+# the clipped pixels on the picture itself: blue where it has gone black,
+# red where it has gone white, with the pointer brought back over the
+# picture first so that the handle's tooltip is not over the panel while
+# the paint is on. The pointer is in the film, since where it goes is the
+# point, and it moves as a hand would, through device.py.
+#
+#   ./histogram            on images/mora/mora.jpg
+#   ./histogram FILE       on another picture
+
+. "$(dirname "$0")/lib.sh"
+
+file=${1:-$ROOT/images/mora/mora.jpg}
+
+open 1000 600 "$file"
+record "histogram.mp4" cursor
+started=$(since_record)
+sleep 0.2
+
+set -- $(window geometry)
+# The histogram toggle is the first button of the right strip: centered
+# across the strip, a bar's padding under the top bar.
+glide $(($1 + $3 - 15)) $(($2 + 45))
+sleep 0.5
+click
+sleep 0.8
+
+# The band is as wide as the plot, one logical pixel a bin: 256 wide, its
+# right end a panel's inset in from the right strip, and its handles stand
+# on its ends. Each is dragged a fifth of the way in.
+band_y=$(($2 + 195))
+black_x=$(($1 + 692))
+white_x=$(($1 + 948))
+glide "$black_x" "$band_y"
+sleep 0.3
+drag 50 0
+sleep 0.8
+glide "$white_x" "$band_y"
+sleep 0.3
+drag -50 0
+sleep 0.8
+
+glide $(($1 + $3 / 2)) $(($2 + $4 * 2 / 3))
+sleep 0.5
+hold w 1
+sleep 1
+film=$(cut)
+close
+gif "$film" "histogram.gif" 800 "$started"
