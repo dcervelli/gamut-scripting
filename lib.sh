@@ -51,8 +51,19 @@ done
 cleanup() {
     [ -z "${RECORDER:-}" ] || kill -INT "$RECORDER" 2>/dev/null || true
     [ -z "${WINDOW:-}" ] || kill "$(window pid)" 2>/dev/null || true
+    [ -z "${POINTER_HIDDEN:-}" ] || hyprctl eval "hl.config({ cursor = { hide_on_key_press = $POINTER_HIDDEN } })" >/dev/null
 }
 trap cleanup EXIT
+
+# Keep the pointer on screen while keys are pressed, for a film that has
+# both in it: the desk hides the pointer on a key press, and the window is
+# told it has left, so whatever was up because the pointer was over
+# something — a tooltip, a region's measurements — goes with it. The
+# setting is put back however it was when the script ends.
+keep_pointer() {
+    POINTER_HIDDEN=$(hyprctl getoption cursor:hide_on_key_press | awk 'NR == 1 { print $2 }')
+    hyprctl eval 'hl.config({ cursor = { hide_on_key_press = false } })' >/dev/null
+}
 
 # Every gamut window the compositor knows, one address per line.
 gamut_windows() {
@@ -79,7 +90,7 @@ open() {
     shift 2
 
     before=" $(gamut_windows | tr '\n' ' ') "
-    command="$GAMUT --size $width $height"
+    command="env${ENVIRONMENT:-} $GAMUT --size $width $height"
     for path; do
         command="$command $(shell_quote "$path")"
     done
@@ -105,6 +116,15 @@ open() {
     # would otherwise land in whatever it was over.
     park
     sleep 0.3
+}
+
+# Give the program a variable in its environment when `open` starts it:
+# the window is started by the compositor, not by this script, so the
+# script's own environment does not reach it.
+#
+#   environment XDG_PICTURES_DIR "$FILMS/pasted"
+environment() {
+    ENVIRONMENT="${ENVIRONMENT:-} $1=$(shell_quote "$2")"
 }
 
 # Where on the focused monitor a W by H window goes, in logical pixels
@@ -199,6 +219,20 @@ glide() {
     python3 "$ROOT/device.py" glide "$1" "$2"
 }
 
+# Put the pointer at a point in the layout to the hundredth of a logical
+# pixel, as the window sees it: for the start of a drag that is to begin
+# on a given pixel of the picture. `glide` gets the pointer within a fifth
+# of a pixel, and that would do, but the window is told where the pointer
+# is only as it crosses from one whole pixel to the next, and then the
+# exact place of that crossing; the last of a glide's small steps are not
+# heard, and where the window has the pointer is wherever it crossed in.
+# `place` ends with a crossing that lands on the mark: see device.py.
+place() {
+    CURSOR_X=$1
+    CURSOR_Y=$2
+    python3 "$ROOT/device.py" place "$1" "$2"
+}
+
 focused() {
     [ "$(hyprctl activewindow -j | jq -r .address)" = "$WINDOW" ]
 }
@@ -233,18 +267,29 @@ scale() {
 
 # Turn the wheel N notches under the pointer, positive away from the hand,
 # which zooms in about it, all at once or spread over SECONDS; drag the
-# left button DX, DY logical pixels from where the pointer is; and click
-# the left button where the pointer is. All three are a device of our own:
-# see device.py.
+# left button DX, DY logical pixels from where the pointer is, or to the
+# point X, Y in the layout; and click the left button where the pointer
+# is. All four are a device of our own: see device.py.
 #
 #   wheel 14         a flick
 #   wheel -20 3      a slow turn, for reading what scrolls past
+#   drag 50 0        a handle pulled a short way
+#   drag_to X Y      the picture dragged to bring a point of it somewhere,
+#                    however far: a long drag is accelerated like a glide,
+#                    and this one corrects for it the way `glide` does
+#   drag_to X Y placed
+#                    a box drawn out to a given pixel: the drag ends with
+#                    `place`, so that the window has the pointer exactly
 wheel() {
     python3 "$ROOT/device.py" wheel "$@"
 }
 
 drag() {
     python3 "$ROOT/device.py" drag "$1" "$2"
+}
+
+drag_to() {
+    python3 "$ROOT/device.py" drag_to "$@"
 }
 
 click() {

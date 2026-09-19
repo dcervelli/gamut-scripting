@@ -1,0 +1,250 @@
+#!/bin/sh
+# The README's region: a web page's screenshot in a 1000x600 window, `x`
+# pressed for the crosshair and a box dragged out around the wordmark in
+# the middle of it, ten pixels loose on every side, then tightened by hand
+# and key. The pointer goes to the handle on the left edge and the wheel
+# zooms in five notches about it, so that the edge and the letters it is
+# to meet are seen close; the handle is clicked to make it the current
+# one, the pointer steps just inside the region, and Right pressed ten
+# times or so brings the edge in to the first letter, a pixel a press,
+# with the region's measurements up the whole way since the pointer is on
+# it, so the edge's coordinate counts as it goes. Then the picture is
+# dragged to bring the handle on the top edge into view, and the same is
+# done there — with the picture dragged a little further once the handle
+# is taken, so that the spike of the M, the highest point the edge is to
+# meet, is in view — and on the right and the bottom. Ctrl+C copies the
+# region, the paste button comes up in the left strip once the clipboard
+# is seen to hold a picture, and Ctrl+V pastes it: the file it writes is
+# shown in the region's place, cut to the pixel. The pointer is in the
+# film, since where it goes is the point, and it moves as a hand would,
+# through device.py.
+#
+# The zoom and the pans move the picture under the handles, so the script
+# keeps its own account of the view — the image point at the middle of the
+# window and the size of an image pixel on screen — the same sums the
+# program does, to know where each handle is when the pointer's turn comes
+# to go to it.
+#
+# A paste is written where the desktop keeps pictures; this one goes under
+# $FILMS instead, and the directory is cleared before each take.
+#
+#   ./region                 on images/omarchy.png
+#   ./region FILE X Y W H    on another picture, tightened to that box of its pixels
+
+. "$(dirname "$0")/lib.sh"
+
+command -v wl-paste >/dev/null || { echo "wl-paste is not installed" >&2; exit 1; }
+
+file=${1:-$ROOT/images/omarchy.png}
+x=${2:-225}
+y=${3:-286}
+w=${4:-1434}
+h=${5:-331}
+loose=10
+notches=5
+set -- $(magick identify -format '%w %h' "$file")
+W=$1
+H=$2
+
+# The view: VX, VY is the image point under the middle of the area the bars
+# leave, and VZ the logical pixels one image pixel is drawn at. `at` says
+# where image point X, Y is in the layout, to the pixel, which is near
+# enough for a handle; `pixel` says where pixel X, Y is, for a drag that is
+# to begin and end on given pixels; `zoomed` and `panned` follow the wheel
+# turned under the pointer and the picture dragged, and clamp the view as
+# the program does, which is at the picture's edges and no further.
+#
+# `pixel` is given to the hundredth, and the pointer is put there with
+# `place` rather than `glide`: a glide's last small steps are not heard by
+# the window, and what it has for the pointer's place can be a third of a
+# pixel off, which at this zoom is most of an image pixel. `under` asks
+# the program which image pixel it takes a placed pointer to be over, in
+# case the sums here and its own differ by a pixel.
+view() {
+    geometry=$(window geometry)
+    awk -v W="$W" -v H="$H" -v geometry="$geometry" -v bar=30 \
+        -v VX="${VX:-0}" -v VY="${VY:-0}" -v VZ="${VZ:-0}" \
+        -v px="${CURSOR_X:-0}" -v py="${CURSOR_Y:-0}" "$@" '
+        function clamp(v, size, extent,   limit) {
+            limit = size / 2 - extent / (2 * VZ); if (limit < 0) limit = 0
+            if (v < size / 2 - limit) v = size / 2 - limit
+            if (v > size / 2 + limit) v = size / 2 + limit
+            return v
+        }
+        function state() { printf "VX=%.4f VY=%.4f VZ=%.6f\n", VX, VY, VZ }
+        BEGIN {
+            split(geometry, g, " "); wx = g[1]; wy = g[2]; ww = g[3]; wh = g[4]
+            cx = wx + ww / 2; cy = wy + wh / 2
+            vw = ww - 2 * bar; vh = wh - 2 * bar
+            if (what == "fit") {
+                VZ = vw / W; if (vh / H < VZ) VZ = vh / H
+                VX = W / 2; VY = H / 2; state()
+            } else if (what == "at") {
+                printf "%d %d\n", int(cx + (X - VX) * VZ + 0.5), int(cy + (Y - VY) * VZ + 0.5)
+            } else if (what == "pixel") {
+                printf "%.2f %.2f\n", cx + (X + 0.5 - VX) * VZ, cy + (Y + 0.5 - VY) * VZ
+            } else if (what == "zoomed") {
+                ax = VX + (px - cx) / VZ; ay = VY + (py - cy) / VZ
+                VZ = VZ * 1.25 ^ n
+                VX = clamp(ax - (px - cx) / VZ, W, vw); VY = clamp(ay - (py - cy) / VZ, H, vh)
+                state()
+            } else if (what == "panned") {
+                VX = clamp(VX - dx / VZ, W, vw); VY = clamp(VY - dy / VZ, H, vh)
+                state()
+            }
+        }'
+}
+at() { view -v what=at -v X="$1" -v Y="$2"; }
+pixel() { view -v what=pixel -v X="$1" -v Y="$2"; }
+
+# The image pixel the program takes the pointer to be over once it is at
+# layout point X, Y: Ctrl+Shift+. copies the pixel's coordinate, and the
+# clipboard is read back. The toast that says so is up for a few seconds,
+# so this is for before the film.
+under() {
+    glide "$1" "$2"
+    place "$1" "$2"
+    sleep 0.2
+    press ctrl+shift+dot
+    sleep 0.3
+    wl-paste -n | tr ',' ' '
+}
+
+# Turn the wheel N notches with the pointer where it is, and follow it.
+zoom() {
+    wheel "$1"
+    eval "$(view -v what=zoomed -v n="$1")"
+}
+
+# Drag the picture so that image point X, Y comes to layout point SX, SY:
+# a drag of that much from wherever the pointer is put first, which is as
+# far on the other side of the window's middle, so that the whole of the
+# drag is inside the window and clear of the handles it goes past. A way
+# too long for one stroke inside the window is dragged in two or three.
+pan() {
+    set -- $(at "$1" "$2") "$3" "$4"
+    dx=$(($3 - $1))
+    dy=$(($4 - $2))
+    while [ "$dx" -ne 0 ] || [ "$dy" -ne 0 ]; do
+        set -- $(window geometry) $(stroke "$dx" 700) $(stroke "$dy" 400)
+        glide $(($1 + $3 / 2 - $5 / 2)) $(($2 + $4 / 2 - $6 / 2))
+        sleep 0.15
+        drag_to $((CURSOR_X + $5)) $((CURSOR_Y + $6))
+        eval "$(view -v what=panned -v dx="$5" -v dy="$6")"
+        dx=$((dx - $5))
+        dy=$((dy - $6))
+    done
+}
+
+# As much of the distance D as one stroke may take, up to MOST either way.
+stroke() {
+    if [ "$1" -gt "$2" ]; then echo "$2"
+    elif [ "$1" -lt "-$2" ]; then echo "-$2"
+    else echo "$1"
+    fi
+}
+
+rm -rf "$FILMS/pasted"
+environment XDG_PICTURES_DIR "$FILMS/pasted"
+
+keep_pointer
+open 1000 600 "$file"
+eval "$(view -v what=fit)"
+
+# The box is every pixel the drag touched, so it is drawn from the pixel
+# `loose` outside the top left corner to the one `loose` outside the
+# bottom right — or the pixels the program reads those two points as,
+# which it is asked first. Its edges are then the boundaries just outside
+# those pixels: `right` and `bottom` here are the far edges, one past the
+# last pixel, which is where their handles sit.
+begin=$(pixel $((x - loose)) $((y - loose)))
+end=$(pixel $((x + w - 1 + loose)) $((y + h - 1 + loose)))
+set -- $(under $begin)
+left=$1
+top=$2
+set -- $(under $end)
+right=$(($1 + 1))
+bottom=$(($2 + 1))
+# The last toast has to be gone before the film starts.
+sleep 3.2
+
+record "region.mp4" cursor
+started=$(since_record)
+sleep 0.5
+
+keys x
+sleep 0.5
+glide $begin
+place $begin
+sleep 0.3
+drag_to $end placed
+sleep 0.4
+
+# Each edge's handle sits on the middle of that edge, and the edges move as
+# the region is tightened, so each is found where the last step left it.
+# The pointer arrives on the handle and clicks it to make it the arrows'
+# (`grab`), then steps inside the region — a little past where the edge
+# will stop, and to one side of the edge's label — and stays there for the
+# presses (`tighten`), so that the region's measurements, which are up
+# while the pointer is on it, stay up while the edge comes in to meet the
+# pointer. How many presses is how far the rough edge is from the tight
+# one: ten, give or take the pixel the drag's end was read as.
+grab() {
+    glide $(at "$1" "$2")
+    sleep 0.15
+    click
+    sleep 0.2
+}
+tighten() {
+    glide $(at "$1" "$2" | awk -v key="$3" -v n="$4" -v z="$VZ" '{
+        inward = n * z + 8
+        if (key == "Right") print $1 + inward, $2 + 30
+        if (key == "Left") print $1 - inward, $2 + 30
+        if (key == "Down") print $1 + 30, $2 + inward
+        if (key == "Up") print $1 + 30, $2 - inward
+    }')
+    sleep 0.15
+    for _ in $(seq "$4"); do keys "$3"; done
+    sleep 0.4
+}
+set -- $(window geometry)
+glide $(at "$left" $(((top + bottom) / 2)))
+sleep 0.2
+zoom "$notches"
+sleep 0.5
+grab "$left" $(((top + bottom) / 2))
+tighten "$left" $(((top + bottom) / 2)) Right $((x - left))
+left=$x
+
+# The top edge is to meet the highest point of the wordmark, which is off
+# to the left of the edge's middle — the spike of the M — so once the
+# handle is taken the picture is dragged a little further right, to have
+# that point in view as the edge comes down to it.
+pan $(((left + right) / 2)) "$top" $(($1 + 560)) $(($2 + 200))
+sleep 0.3
+grab $(((left + right) / 2)) "$top"
+pan $(((left + right) / 2)) "$top" $(($1 + 800)) $(($2 + 200))
+sleep 0.3
+tighten $(((left + right) / 2)) "$top" Down $((y - top))
+top=$y
+
+pan "$right" $(((top + bottom) / 2)) $(($1 + 860)) $(($2 + 300))
+sleep 0.3
+grab "$right" $(((top + bottom) / 2))
+tighten "$right" $(((top + bottom) / 2)) Left $((right - x - w))
+right=$((x + w))
+
+pan $(((left + right) / 2)) "$bottom" $(($1 + 500)) $(($2 + 400))
+sleep 0.3
+grab $(((left + right) / 2)) "$bottom"
+tighten $(((left + right) / 2)) "$bottom" Up $((bottom - y - h))
+
+press ctrl+c
+# The toast says what was copied, and the paste button follows once the
+# clipboard has been looked at.
+sleep 1.5
+press ctrl+v
+sleep 1.5
+film=$(cut)
+close
+gif "$film" "region.gif" 800 "$started"

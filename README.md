@@ -20,6 +20,7 @@ is the script.
 | `histogram` | the photograph with the histogram opened from its button, the black and white handles on the band each dragged a fifth of the way in, and `w` held for a second to paint the clipped pixels |
 | `ui` | the directory of the mountain's four rasters, the pointer held on the counter at the head of the top bar for its tooltip, the help button at the foot of the right strip pressed and the table of keys scrolled to its end over three seconds, Esc, and the button at the end of the top bar pressed to hide the interface |
 | `mandelbrot` | a PNG that a program rewrites every second, one step further into the Mandelbrot set, watched for ten seconds: zoomed four steps into the middle and panned once around it partway, then Space |
+| `region` | a web page's screenshot, `x` pressed and a box dragged out ten pixels loose around the wordmark, the wheel turned five notches in over the handle on its left edge, the handle clicked and Right pressed until the edge meets the first letter, the picture dragged to bring the top, right and bottom handles into view in turn and each brought in the same way, then Ctrl+C and Ctrl+V, so that the copy is pasted and shown, cut to the pixel |
 
 ```sh
 ./main_screenshot                       # ~/git/gamut/user-docs/screenshots/main_screenshot.jpg
@@ -117,7 +118,42 @@ window and back is not, and for a tooltip, which the program shows only
 over a pointer that arrived by motion. The compositor accelerates motion
 from a mouse, so a move of the whole distance lands past its mark;
 `device.py glide` asks Hyprland where the pointer got to and moves what is
-left, until it is there.
+left, until it is there. `drag_to` is the same with the button held, for a
+drag as long as a region's diagonal, which `drag` would send well past its
+mark. The mark may be a fraction of a pixel: the pointer's place is one,
+and `hyprctl cursorpos` cuts the fraction off, but the Lua API has it
+whole, and since `hyprctl eval` prints nothing a script returns and only
+what it raises, `device.py` raises the position and reads it off the
+error. Single units of motion — a third of a pixel or so, slow motion
+being slowed further — take the pointer the last of the way, to within a
+fifth of a pixel.
+
+Where the pointer is and where the window has it are two things. The
+compositor tells the window of a motion only when the whole logical pixel
+the pointer is in changes, and then tells it the exact place of that
+event; the small steps that end a glide are not heard, and the window has
+the pointer wherever it last crossed from one pixel into the next — up to
+a third of a pixel from where it stopped, which at a zoom under 100% is
+most of an image pixel. A drag drawn that way ends on a pixel the script
+did not choose. `place` is the remedy, for the two ends of the drag that
+draws `region`'s box: the pointer is warped, which sets its place exactly
+and which the window is not told of, to a pixel and a little short of the
+mark; rested, so that the acceleration has forgotten it moved; and sent
+three units, which after a rest carry it a whole pixel and a little, the
+same distance every time to the hundredth — over a pixel's edge and onto
+the mark, which is what the window is then told. `region` also asks the
+program, before the film starts, which pixels it takes the two placed
+points to be over — `Ctrl+Shift+.` copies the coordinate, and the
+clipboard is read back — and counts the presses that tighten each edge
+from its answer, in case its sums and the script's differ by a pixel.
+The toast that says the coordinate was copied is gone before the recorder
+starts.
+
+The desk hides the pointer when a key is pressed, and tells the window it
+has left, which takes down whatever was up because the pointer was over
+something — a tooltip, a region's measurements. `keep_pointer` turns that
+off for the run, through the compositor's Lua config, and `cleanup` puts
+it back however it was.
 
 It is a keyboard too, for the bindings `wtype` cannot reach. A binding in
 gamut's `app/input.rs` is matched either by what the key says (`Char("+")`)
