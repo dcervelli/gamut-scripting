@@ -102,37 +102,41 @@ pixel() { view -v what=pixel -v X="$1" -v Y="$2"; }
 # clipboard is read back. The toast that says so is up for a few seconds,
 # so this is for before the film.
 under() {
-    glide "$1" "$2"
-    place "$1" "$2"
+    keyboard
+    gesture glide "$1" "$2" -- place "$1" "$2" -- key ctrl+shift+dot
     sleep 0.2
-    press ctrl+shift+dot
-    sleep 0.3
     wl-paste -n | tr ',' ' '
 }
 
-# Turn the wheel N notches with the pointer where it is, and follow it.
+# Take the pointer to image point X, Y and turn the wheel N notches there,
+# and follow the view.
 zoom() {
-    wheel "$1"
-    eval "$(view -v what=zoomed -v n="$1")"
+    gesture glide $(at "$1" "$2") -- wheel "$3"
+    eval "$(view -v what=zoomed -v n="$3")"
 }
 
-# Drag the picture so that image point X, Y comes to layout point SX, SY:
-# a drag of that much from wherever the pointer is put first, which is as
-# far on the other side of the window's middle, so that the whole of the
-# drag is inside the window and clear of the handles it goes past. A way
-# too long for one stroke inside the window is dragged in two or three.
-pan() {
+# The strokes that drag the picture so that image point X, Y comes to
+# layout point SX, SY, added to WORDS for `gesture`: each a glide to a
+# start and a drag from there, the start as far on the other side of the
+# window's middle as the stroke goes, so that the whole of the stroke is
+# inside the window and clear of the handles it goes past; a way too long
+# for one stroke is two or three. The view is moved on by what is asked,
+# and each stroke is noted in STROKES — which of the gesture's actions
+# its glide is, and what it asked — for the view to be set right by what
+# the pointer was seen to move once the gesture is done: see `stage`.
+strokes() {
     set -- $(at "$1" "$2") "$3" "$4"
     dx=$(($3 - $1))
     dy=$(($4 - $2))
-    while [ "$dx" -ne 0 ] || [ "$dy" -ne 0 ]; do
+    while [ "$dx" -gt 1 ] || [ "$dx" -lt -1 ] || [ "$dy" -gt 1 ] || [ "$dy" -lt -1 ]; do
         set -- $(window geometry) $(stroke "$dx" 700) $(stroke "$dy" 400)
-        glide $(($1 + $3 / 2 - $5 / 2)) $(($2 + $4 / 2 - $6 / 2))
-        sleep 0.15
-        drag_to $((CURSOR_X + $5)) $((CURSOR_Y + $6))
-        eval "$(view -v what=panned -v dx="$5" -v dy="$6")"
-        dx=$((dx - $5))
-        dy=$((dy - $6))
+        set -- $(($1 + $3 / 2 - $5 / 2)) $(($2 + $4 / 2 - $6 / 2)) "$5" "$6"
+        WORDS="$WORDS glide $1 $2 -- drag_to $(($1 + $3)) $(($2 + $4)) --"
+        STROKES="$STROKES $ACTIONS:$3:$4"
+        ACTIONS=$((ACTIONS + 2))
+        eval "$(view -v what=panned -v dx="$3" -v dy="$4")"
+        dx=$((dx - $3))
+        dy=$((dy - $4))
     done
 }
 
@@ -142,6 +146,54 @@ stroke() {
     elif [ "$1" -lt "-$2" ]; then echo "-$2"
     else echo "$1"
     fi
+}
+
+# One edge brought in, as one gesture: the picture dragged to bring the
+# handle at image point X, Y to layout point SX, SY; the handle clicked to
+# make it the arrows'; the picture dragged again, if TX, TY are given, to
+# have something else in view; the pointer stepped inside the region — a
+# little past where the edge will stop, and to one side of the edge's
+# label — and KEY pressed N times there, so that the region's
+# measurements, which are up while the pointer is on it, stay up while
+# the edge comes in to meet the pointer. How many presses is how far the
+# rough edge is from the tight one: ten, give or take the pixel the
+# drag's end was read as. The arrows are pressed by the device rather
+# than by wtype, as the same hand's gesture: an arrow is the same key on
+# any layout.
+#
+# The strokes are planned on the view as it is expected to be, and the
+# pointer lands within half a pixel of where each was told to; afterwards
+# the view is set right from where the pointer was seen to be at each
+# stroke's ends, so that the next stage's handles are where it says.
+#
+#   stage X Y KEY N SX SY [TX TY]
+stage() {
+    WORDS=
+    STROKES=
+    ACTIONS=0
+    strokes "$1" "$2" "$5" "$6"
+    WORDS="$WORDS glide $(at "$1" "$2") -- click --"
+    ACTIONS=$((ACTIONS + 2))
+    if [ $# -gt 6 ]; then
+        strokes "$1" "$2" "$7" "$8"
+    fi
+    WORDS="$WORDS glide $(at "$1" "$2" | awk -v key="$3" -v n="$4" -v z="$VZ" '{
+        inward = n * z + 8
+        if (key == "right") print $1 + inward, $2 + 30
+        if (key == "left") print $1 - inward, $2 + 30
+        if (key == "down") print $1 + 30, $2 + inward
+        if (key == "up") print $1 + 30, $2 - inward
+    }') $(for _ in $(seq "$4"); do printf ' -- key %s' "$3"; done)"
+    keyboard
+    gesture $WORDS
+    for noted in $STROKES; do
+        eval "$(printf '%s\n' "$POSITIONS" | awk -v noted="$noted" '
+            BEGIN { split(noted, n, ":") }
+            NR == n[1] + 1 { x = $1; y = $2 }
+            NR == n[1] + 2 { printf "dx=%.2f dy=%.2f\n", $1 - x - n[2], $2 - y - n[3] }')"
+        eval "$(view -v what=panned -v dx="$dx" -v dy="$dy")"
+    done
+    sleep 0.2
 }
 
 rm -rf "$FILMS/pasted"
@@ -173,78 +225,37 @@ started=$(since_record)
 sleep 0.5
 
 keys x
-sleep 0.5
-glide $begin
-place $begin
 sleep 0.3
-drag_to $end placed
-sleep 0.4
+gesture glide $begin -- place $begin -- drag_to $end placed
+sleep 0.3
 
 # Each edge's handle sits on the middle of that edge, and the edges move as
-# the region is tightened, so each is found where the last step left it.
-# The pointer arrives on the handle and clicks it to make it the arrows'
-# (`grab`), then steps inside the region — a little past where the edge
-# will stop, and to one side of the edge's label — and stays there for the
-# presses (`tighten`), so that the region's measurements, which are up
-# while the pointer is on it, stay up while the edge comes in to meet the
-# pointer. How many presses is how far the rough edge is from the tight
-# one: ten, give or take the pixel the drag's end was read as.
-grab() {
-    glide $(at "$1" "$2")
-    sleep 0.15
-    click
-    sleep 0.2
-}
-tighten() {
-    glide $(at "$1" "$2" | awk -v key="$3" -v n="$4" -v z="$VZ" '{
-        inward = n * z + 8
-        if (key == "Right") print $1 + inward, $2 + 30
-        if (key == "Left") print $1 - inward, $2 + 30
-        if (key == "Down") print $1 + 30, $2 + inward
-        if (key == "Up") print $1 + 30, $2 - inward
-    }')
-    sleep 0.15
-    for _ in $(seq "$4"); do keys "$3"; done
-    sleep 0.4
-}
+# the region is tightened, so each is found where the last stage left it.
 set -- $(window geometry)
-glide $(at "$left" $(((top + bottom) / 2)))
+zoom "$left" $(((top + bottom) / 2)) "$notches"
+sleep 0.3
+gesture glide $(at "$left" $(((top + bottom) / 2))) -- click -- glide $(at "$left" $(((top + bottom) / 2)) | awk -v n="$((x - left))" -v z="$VZ" '{ print $1 + n * z + 8, $2 + 30 }') $(for _ in $(seq $((x - left))); do printf ' -- key right'; done)
 sleep 0.2
-zoom "$notches"
-sleep 0.5
-grab "$left" $(((top + bottom) / 2))
-tighten "$left" $(((top + bottom) / 2)) Right $((x - left))
 left=$x
 
 # The top edge is to meet the highest point of the wordmark, which is off
 # to the left of the edge's middle — the spike of the M — so once the
 # handle is taken the picture is dragged a little further right, to have
 # that point in view as the edge comes down to it.
-pan $(((left + right) / 2)) "$top" $(($1 + 560)) $(($2 + 200))
-sleep 0.3
-grab $(((left + right) / 2)) "$top"
-pan $(((left + right) / 2)) "$top" $(($1 + 800)) $(($2 + 200))
-sleep 0.3
-tighten $(((left + right) / 2)) "$top" Down $((y - top))
+stage $(((left + right) / 2)) "$top" down $((y - top)) $(($1 + 560)) $(($2 + 200)) $(($1 + 800)) $(($2 + 200))
 top=$y
 
-pan "$right" $(((top + bottom) / 2)) $(($1 + 860)) $(($2 + 300))
-sleep 0.3
-grab "$right" $(((top + bottom) / 2))
-tighten "$right" $(((top + bottom) / 2)) Left $((right - x - w))
+stage "$right" $(((top + bottom) / 2)) left $((right - x - w)) $(($1 + 860)) $(($2 + 300))
 right=$((x + w))
 
-pan $(((left + right) / 2)) "$bottom" $(($1 + 500)) $(($2 + 400))
-sleep 0.3
-grab $(((left + right) / 2)) "$bottom"
-tighten $(((left + right) / 2)) "$bottom" Up $((bottom - y - h))
+stage $(((left + right) / 2)) "$bottom" up $((bottom - y - h)) $(($1 + 500)) $(($2 + 400))
 
 press ctrl+c
 # The toast says what was copied, and the paste button follows once the
 # clipboard has been looked at.
-sleep 1.5
+sleep 1.2
 press ctrl+v
-sleep 1.5
+sleep 1
 film=$(cut)
 close
 gif "$film" "region.gif" 800 "$started"

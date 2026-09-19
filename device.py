@@ -28,6 +28,13 @@ A key from here is the real keycode, read under the real keymap.
     device.py click            the left button pressed and released
     device.py key CHORD        a key by its position, with modifiers: 2, shift+2, ctrl+shift+c
 
+Several of these, separated by `--`, are done in turn by the one device:
+`device.py glide 400 300 -- click -- key down -- key down` is a hand that
+goes somewhere, clicks and presses a key twice, and the compositor meets
+the device once rather than four times. After each, where the pointer is
+is printed, a line of two numbers: what a drag moved is the difference
+between two of them.
+
 /dev/uinput has to be writable by the user; Omarchy grants that through an
 ACL, and `getfacl /dev/uinput` says whether it has.
 """
@@ -74,10 +81,7 @@ NOTCH = 120
 
 # How long the compositor takes to notice a device that has just appeared,
 # and to drain what it sent before it goes.
-SETTLE = 0.25
-
-# How near its mark a glide leaves the pointer, in logical pixels.
-TOLERANCE = 0.2
+SETTLE = 0.2
 
 # What the compositor's acceleration makes of a move at `move`'s pace: a
 # move of the whole distance lands this much past its mark, so a glide
@@ -85,6 +89,11 @@ TOLERANCE = 0.2
 # the safe side: a pointer that overshoots the window during a drag is a
 # pointer the window sees leave, and a drag it sees end.
 ACCELERATION = 1.24
+
+# Logical pixels a step of a move, at a step a frame: a drag on screen
+# that reads as a hand's, not so slow as to try the patience of a film.
+# The acceleration is the same however fast the steps come.
+PACE = 16
 
 # How near its mark `place` has to get the pointer, and the units of motion
 # it sends for the last step, with how far they carry: three units after a
@@ -94,6 +103,20 @@ ACCELERATION = 1.24
 PLACED = 0.03
 STEP = 3
 STEP_CARRIES = 1.006
+
+# How many steps of two units a drag creeps from its press before it sets
+# off: nine or ten pixels, past the six the toolkit takes for a click.
+CREEP = 15
+
+# The units of motion that end a glide, after how long a rest, and how far
+# they were seen to carry: well over a pixel, so the move is sure to cross
+# into another. Measured on the way, as STEP's carry is; this is the first
+# guess, and a glide that lands more than SEALED off its mark for it is
+# ended again with the measure.
+SEAL_UNITS = 6
+SEAL_REST = 0.1
+SEAL_CARRIES = 5.6
+SEALED = 0.5
 
 # Lua for Hyprland that raises the pointer's position as its error.
 CURSOR_POSITION = 'local p = hl.get_cursor_pos(); error(string.format("%.4f %.4f", p.x, p.y))'
@@ -113,6 +136,7 @@ class Device:
         fcntl.ioctl(self.fd, UI_DEV_SETUP, setup)
         fcntl.ioctl(self.fd, UI_DEV_CREATE)
         time.sleep(SETTLE)
+        self.seal_carries = SEAL_CARRIES
 
     def close(self):
         time.sleep(SETTLE)
@@ -142,7 +166,8 @@ class Device:
         # In steps, so that it is a drag rather than a jump: a pointer that
         # arrives in one event is one motion event, and a drag threshold
         # or an easing that watches the pointer's path sees nothing of it.
-        steps = max(1, int(max(abs(dx), abs(dy)) / 8))
+        # PACE pixels a step, about a step a frame at the film's 60.
+        steps = max(1, int(max(abs(dx), abs(dy)) / PACE))
         gone = [0, 0]
         for i in range(1, steps + 1):
             to = [dx * i // steps, dy * i // steps]
@@ -150,23 +175,28 @@ class Device:
             self.emit(EV_REL, REL_Y, to[1] - gone[1])
             self.sync()
             gone = to
-            time.sleep(0.008)
+            time.sleep(0.012)
 
     def glide(self, x, y):
         # Motion from a mouse is accelerated by the compositor, so a move of
         # the whole distance lands past its mark; move for the acceleration,
         # ask where the pointer got to and move what is left, which is a
-        # smaller and so a slower move, until it is there. The only thing here that knows the pointer's
-        # place is Hyprland, and it is asked again until it gives the same
-        # answer twice, since a move is not over when its last event has
-        # been written.
+        # smaller and so a slower move, until it is within the pixel. The
+        # only thing here that knows the pointer's place is Hyprland, and
+        # it is asked again until it gives the same answer twice, since a
+        # move is not over when its last event has been written. To the
+        # fraction is `place`.
         #
-        # The pointer's place is a fraction, and so may the mark be: at a
-        # zoom where an image pixel is half a logical one, only a pointer
-        # within a quarter of a pixel of its mark is over the pixel meant.
-        # So once the whole pixels are covered, single units of motion —
-        # each a third of a pixel or so, slow motion being slowed further —
-        # take it the rest of the way, to within TOLERANCE.
+        # The window hears of the pointer only as it crosses from one whole
+        # pixel into the next, and then where that event landed, so after a
+        # last move of less than a pixel the window has the pointer up to a
+        # pixel from where it is. The glide therefore ends with a move it
+        # must hear: the pointer is warped back — which the window is not
+        # told of — by as far as SEAL_UNITS carry it, and sent them, which
+        # crosses a pixel's edge on the way and lands within half a pixel
+        # of the mark. Where the pointer is and where the window has it
+        # are then the same, and a drag from one such place to another
+        # pans by what the pointer moved.
         for _ in range(12):
             at = self.resting()
             dx, dy = x - at[0], y - at[1]
@@ -174,16 +204,18 @@ class Device:
                 break
             self.move(round(dx / ACCELERATION), round(dy / ACCELERATION))
             time.sleep(0.05)
-        for _ in range(40):
-            at = self.resting()
-            dx, dy = x - at[0], y - at[1]
-            if abs(dx) <= TOLERANCE and abs(dy) <= TOLERANCE:
-                return
-            step = lambda d: 0 if abs(d) <= TOLERANCE else (1 if d > 0 else -1)
-            self.emit(EV_REL, REL_X, step(dx))
-            self.emit(EV_REL, REL_Y, step(dy))
+        for _ in range(3):
+            start = (x - self.seal_carries, y - self.seal_carries)
+            self.warp(*start)
+            time.sleep(SEAL_REST)
+            self.emit(EV_REL, REL_X, SEAL_UNITS)
+            self.emit(EV_REL, REL_Y, SEAL_UNITS)
             self.sync()
-            time.sleep(0.1)
+            time.sleep(0.05)
+            at = self.resting()
+            if abs(at[0] - x) <= SEALED and abs(at[1] - y) <= SEALED:
+                return
+            self.seal_carries = at[0] - start[0]
 
     def place(self, x, y):
         # The window is told where the pointer is only when the whole pixel
@@ -202,11 +234,11 @@ class Device:
         for _ in range(4):
             start = (x - carries[0], y - carries[1])
             self.warp(*start)
-            time.sleep(0.5)
+            time.sleep(0.3)
             self.emit(EV_REL, REL_X, STEP)
             self.emit(EV_REL, REL_Y, STEP)
             self.sync()
-            time.sleep(0.2)
+            time.sleep(0.15)
             at = self.position()
             if abs(at[0] - x) <= PLACED and abs(at[1] - y) <= PLACED:
                 return
@@ -260,14 +292,35 @@ class Device:
         # frame with the pointer at its mark before the frame that ends the
         # drag: a toolkit takes the drag's end from the last frame it was
         # dragging on, and a motion that arrives in the same frame as the
-        # release is not part of it.
+        # release is not part of it. A drag that pans can lose that last
+        # motion and be none the worse, so it waits less.
         self.button(True)
         time.sleep(0.05)
+        self.creep(x, y)
         self.glide(x, y)
         if placed:
             self.place(x, y)
-        time.sleep(0.3)
+        time.sleep(0.3 if placed else 0.1)
         self.button(False)
+
+    def creep(self, x, y):
+        # A toolkit takes a press for a click until the pointer has gone
+        # some way from it — six logical pixels, for egui — and only then
+        # for a drag, and the motion of the frame that decides it is not
+        # part of the drag. A stroke that sets off at speed loses its first
+        # eight pixels or so that way, and the picture ends up that much
+        # short of where the pointer took it. So the first pixels are
+        # covered two units at a time, two thirds of a pixel each, until
+        # the pointer is well past the toolkit's distance, and what the
+        # deciding frame loses is a fraction of a pixel.
+        start = self.position()
+        sx = 2 if x > start[0] else -2
+        sy = 2 if y > start[1] else -2
+        for _ in range(CREEP):
+            self.emit(EV_REL, REL_X, sx)
+            self.emit(EV_REL, REL_Y, sy)
+            self.sync()
+            time.sleep(0.008)
 
     def click(self):
         self.button(True)
@@ -290,29 +343,37 @@ class Device:
 def main(argv):
     if len(argv) < 2:
         sys.exit(__doc__)
+    actions = [[]]
+    for word in argv[1:]:
+        if word == "--":
+            actions.append([])
+        else:
+            actions[-1].append(word)
     device = Device()
     try:
-        match argv[1:]:
-            case ["wheel", notches]:
-                device.wheel(int(notches))
-            case ["wheel", notches, seconds]:
-                device.wheel(int(notches), float(seconds))
-            case ["glide", x, y]:
-                device.glide(float(x), float(y))
-            case ["drag", dx, dy]:
-                device.drag(int(dx), int(dy))
-            case ["place", x, y]:
-                device.place(float(x), float(y))
-            case ["drag_to", x, y]:
-                device.drag_to(float(x), float(y))
-            case ["drag_to", x, y, "placed"]:
-                device.drag_to(float(x), float(y), placed=True)
-            case ["click"]:
-                device.click()
-            case ["key", chord]:
-                device.key(chord)
-            case _:
-                sys.exit(__doc__)
+        for action in actions:
+            match action:
+                case ["wheel", notches]:
+                    device.wheel(int(notches))
+                case ["wheel", notches, seconds]:
+                    device.wheel(int(notches), float(seconds))
+                case ["glide", x, y]:
+                    device.glide(float(x), float(y))
+                case ["place", x, y]:
+                    device.place(float(x), float(y))
+                case ["drag", dx, dy]:
+                    device.drag(int(dx), int(dy))
+                case ["drag_to", x, y]:
+                    device.drag_to(float(x), float(y))
+                case ["drag_to", x, y, "placed"]:
+                    device.drag_to(float(x), float(y), placed=True)
+                case ["click"]:
+                    device.click()
+                case ["key", chord]:
+                    device.key(chord)
+                case _:
+                    sys.exit(__doc__)
+            print("%.2f %.2f" % device.resting())
     finally:
         device.close()
 

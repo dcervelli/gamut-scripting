@@ -214,9 +214,7 @@ warp() {
 # than appeared. Only for a point inside the window, which keeps the
 # keyboard throughout.
 glide() {
-    CURSOR_X=$1
-    CURSOR_Y=$2
-    python3 "$ROOT/device.py" glide "$1" "$2"
+    gesture glide "$1" "$2"
 }
 
 # Put the pointer at a point in the layout to the hundredth of a logical
@@ -228,9 +226,7 @@ glide() {
 # heard, and where the window has the pointer is wherever it crossed in.
 # `place` ends with a crossing that lands on the mark: see device.py.
 place() {
-    CURSOR_X=$1
-    CURSOR_Y=$2
-    python3 "$ROOT/device.py" place "$1" "$2"
+    gesture place "$1" "$2"
 }
 
 focused() {
@@ -281,19 +277,31 @@ scale() {
 #                    a box drawn out to a given pixel: the drag ends with
 #                    `place`, so that the window has the pointer exactly
 wheel() {
-    python3 "$ROOT/device.py" wheel "$@"
+    gesture wheel "$@"
 }
 
 drag() {
-    python3 "$ROOT/device.py" drag "$1" "$2"
+    gesture drag "$1" "$2"
 }
 
 drag_to() {
-    python3 "$ROOT/device.py" drag_to "$@"
+    gesture drag_to "$@"
 }
 
 click() {
-    python3 "$ROOT/device.py" click
+    gesture click
+}
+
+# Several of the device's actions in turn, as one hand would do them and
+# with the device made once: `gesture glide X Y -- click -- key down`. The
+# actions are device.py's, separated by `--`. Where the pointer was after
+# each is left in POSITIONS, a line of two numbers per action, and the
+# last of them is where the pointer is taken to be from then on.
+gesture() {
+    POSITIONS=$(python3 "$ROOT/device.py" "$@")
+    set -- $(printf '%s\n' "$POSITIONS" | tail -1)
+    CURSOR_X=$1
+    CURSOR_Y=$2
 }
 
 # Press a key by its position rather than by what it says — `shift+2` for
@@ -302,7 +310,7 @@ click() {
 press() {
     keyboard
     for chord; do
-        python3 "$ROOT/device.py" key "$chord"
+        gesture key "$chord"
     done
 }
 

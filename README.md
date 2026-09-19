@@ -116,38 +116,59 @@ is the point.
 way to a button is part of the picture and `cursor`'s leap out of the
 window and back is not, and for a tooltip, which the program shows only
 over a pointer that arrived by motion. The compositor accelerates motion
-from a mouse, so a move of the whole distance lands past its mark;
-`device.py glide` asks Hyprland where the pointer got to and moves what is
-left, until it is there. `drag_to` is the same with the button held, for a
-drag as long as a region's diagonal, which `drag` would send well past its
-mark. The mark may be a fraction of a pixel: the pointer's place is one,
-and `hyprctl cursorpos` cuts the fraction off, but the Lua API has it
-whole, and since `hyprctl eval` prints nothing a script returns and only
-what it raises, `device.py` raises the position and reads it off the
-error. Single units of motion — a third of a pixel or so, slow motion
-being slowed further — take the pointer the last of the way, to within a
-fifth of a pixel.
+from a mouse, so a move of the whole distance lands a quarter past its
+mark; `device.py glide` moves for that — the distance over the measured
+factor — then asks Hyprland where the pointer got to and moves what is
+left, until it is within a pixel. `drag_to` is the same with the button
+held, for a drag as long as a region's diagonal, which `drag` would send
+well past its mark.
+
+The pointer's place is a fraction, and `hyprctl cursorpos` cuts the
+fraction off; the Lua API has it whole, and since `hyprctl eval` prints
+nothing a script returns and only what it raises, `device.py` raises the
+position and reads it off the error.
 
 Where the pointer is and where the window has it are two things. The
 compositor tells the window of a motion only when the whole logical pixel
 the pointer is in changes, and then tells it the exact place of that
-event; the small steps that end a glide are not heard, and the window has
+event; a last move of less than a pixel is not heard, and the window has
 the pointer wherever it last crossed from one pixel into the next — up to
-a third of a pixel from where it stopped, which at a zoom under 100% is
-most of an image pixel. A drag drawn that way ends on a pixel the script
-did not choose. `place` is the remedy, for the two ends of the drag that
-draws `region`'s box: the pointer is warped, which sets its place exactly
-and which the window is not told of, to a pixel and a little short of the
-mark; rested, so that the acceleration has forgotten it moved; and sent
-three units, which after a rest carry it a whole pixel and a little, the
-same distance every time to the hundredth — over a pixel's edge and onto
-the mark, which is what the window is then told. `region` also asks the
-program, before the film starts, which pixels it takes the two placed
-points to be over — `Ctrl+Shift+.` copies the coordinate, and the
-clipboard is read back — and counts the presses that tighten each edge
-from its answer, in case its sums and the script's differ by a pixel.
-The toast that says the coordinate was copied is gone before the recorder
-starts.
+a pixel from where it stopped, which at a zoom under 100% is most of an
+image pixel. So every glide ends on a move the window must hear: the
+pointer is warped back — which sets its place exactly, and which the
+window is not told of — by as far as a fixed few units of motion carry it
+after a rest, and those units are sent, crossing a pixel's edge on the way
+and landing within half a pixel of the mark. How far the units carry is
+measured as they go, since the acceleration decides it, and a glide that
+lands too far off tries again with the measure. `place` goes finer still,
+to the hundredth of a pixel, for the two ends of the drag that draws
+`region`'s box: it warps a pixel short and creeps up three units at a
+time, each a third of a pixel, until the last crosses onto the mark.
+
+A drag has its own trouble at the other end. A toolkit takes a press for a
+click until the pointer has gone some pixels from it, and the motion of
+the frame that decides it is not part of the drag; a stroke that sets off
+at speed loses its first several pixels that way. So `drag_to` creeps the
+first ten pixels a couple of units at a time, past the toolkit's distance,
+before it moves at its pace, and what the deciding frame loses is a
+fraction of a pixel.
+
+`region` asks the program, before the film starts, which pixels it takes
+the two placed corners of the box to be over — `Ctrl+Shift+.` copies the
+coordinate, and the clipboard is read back — and counts the presses that
+tighten each edge from its answer, in case its sums and the script's
+differ by a pixel. The toast that says the coordinate was copied is gone
+before the recorder starts.
+
+Several of the device's actions are done as one hand's `gesture`, the
+device made once and the actions given to it in a row, separated by `--`:
+the glide to a handle, the click that takes it, the drag that brings the
+next part of the picture into view, the arrows that bring the edge in.
+`device.py` prints where the pointer was after each, so `strokes` and `stage`
+can move their model of the view on by what the pointer was really seen to
+move — within a pixel of what was asked, but not on it, and a few strokes'
+worth of that is a handle missed. A pan too long for one stroke inside the
+window is broken into two or three.
 
 The desk hides the pointer when a key is pressed, and tells the window it
 has left, which takes down whatever was up because the pointer was over
