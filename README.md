@@ -25,6 +25,7 @@ is the script.
 ./main_screenshot                       # ~/git/gamut/user-docs/screenshots/main_screenshot.jpg
 GAMUT=~/build/gamut ./compare           # with another binary
 SCREENSHOTS=/tmp/shots ./false_color    # to another directory
+./all                                   # every one of them, in the order above
 ```
 
 Three things are the environment's to say, each with a default:
