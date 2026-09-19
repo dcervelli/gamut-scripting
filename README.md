@@ -116,17 +116,22 @@ is the point.
 way to a button is part of the picture and `cursor`'s leap out of the
 window and back is not, and for a tooltip, which the program shows only
 over a pointer that arrived by motion. The compositor accelerates motion
-from a mouse, so a move of the whole distance lands a quarter past its
-mark; `device.py glide` moves for that — the distance over the measured
-factor — then asks Hyprland where the pointer got to and moves what is
-left, until it is within a pixel. `drag_to` is the same with the button
-held, for a drag as long as a region's diagonal, which `drag` would send
-well past its mark.
+from a mouse, so that a unit of motion carries a distance that depends on
+the pace it comes at; `device.py` has Hyprland give this device alone a
+flat profile, through the Lua API's `hl.device`, at a sensitivity that
+makes every unit exactly a quarter of a logical pixel however fast it is
+sent. Where the pointer is then is arithmetic: where it was when the
+device was made, asked of the compositor once, plus the units sent over
+four. A glide is the units that take it to its mark, at a pace of sixteen
+pixels a frame, and it lands within an eighth of a pixel. `drag_to` is the
+same with the button held.
 
 The pointer's place is a fraction, and `hyprctl cursorpos` cuts the
 fraction off; the Lua API has it whole, and since `hyprctl eval` prints
 nothing a script returns and only what it raises, `device.py` raises the
-position and reads it off the error.
+position and reads it off the error. It is read once, when the device is
+made, and again after each action to be printed, where it is checked
+against the sum.
 
 Where the pointer is and where the window has it are two things. The
 compositor tells the window of a motion only when the whole logical pixel
@@ -134,16 +139,11 @@ the pointer is in changes, and then tells it the exact place of that
 event; a last move of less than a pixel is not heard, and the window has
 the pointer wherever it last crossed from one pixel into the next — up to
 a pixel from where it stopped, which at a zoom under 100% is most of an
-image pixel. So every glide ends on a move the window must hear: the
-pointer is warped back — which sets its place exactly, and which the
-window is not told of — by as far as a fixed few units of motion carry it
-after a rest, and those units are sent, crossing a pixel's edge on the way
-and landing within half a pixel of the mark. How far the units carry is
-measured as they go, since the acceleration decides it, and a glide that
-lands too far off tries again with the measure. `place` goes finer still,
-to the hundredth of a pixel, for the two ends of the drag that draws
-`region`'s box: it warps a pixel short and creeps up three units at a
-time, each a third of a pixel, until the last crosses onto the mark.
+image pixel. So every glide ends on a move the window must hear: its last
+two pixels are one step, sent as one event, which crosses a pixel's edge
+along whichever axis it mostly goes and lands on the mark. `place` is the
+same motion under a name for where the pixel under the pointer is what
+matters, the two ends of the drag that draws `region`'s box.
 
 A drag has its own trouble at the other end. A toolkit takes a press for a
 click until the pointer has gone some pixels from it, and the motion of

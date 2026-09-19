@@ -18,9 +18,10 @@ A key from here is the real keycode, read under the real keymap.
     device.py wheel N [S]      N notches: positive is away from the hand, which zooms in;
                                spread evenly over S seconds rather than sent at once
     device.py glide X Y        the pointer moved, with no button held, until it is at X, Y,
-                               which may be fractions of a logical pixel
-    device.py place X Y        the pointer put at X, Y to the hundredth of a pixel, and the
-                               window told so
+                               which may be fractions of a logical pixel, and the window
+                               told so
+    device.py place X Y        the same; the name is for a script to say where the pixel
+                               under the pointer is what matters
     device.py drag DX DY       the left button held while the pointer moves DX, DY
     device.py drag_to X Y [placed]
                                the left button held while the pointer glides to X, Y —
@@ -35,11 +36,19 @@ the device once rather than four times. After each, where the pointer is
 is printed, a line of two numbers: what a drag moved is the difference
 between two of them.
 
+Motion is sent in units, and the compositor is told to make each unit of
+this device exactly a quarter of a logical pixel, at any pace: a flat
+acceleration profile, for this device alone, so that the pointer's place
+is arithmetic — where it started plus the units sent, over four — and is
+asked of the compositor once, when the device is made. The real mouse
+keeps its own acceleration.
+
 /dev/uinput has to be writable by the user; Omarchy grants that through an
 ACL, and `getfacl /dev/uinput` says whether it has.
 """
 
 import fcntl
+import math
 import os
 import struct
 import subprocess
@@ -83,40 +92,28 @@ NOTCH = 120
 # and to drain what it sent before it goes.
 SETTLE = 0.2
 
-# What the compositor's acceleration makes of a move at `move`'s pace: a
-# move of the whole distance lands this much past its mark, so a glide
-# asks for this fraction of what is left and lands short instead. Short is
-# the safe side: a pointer that overshoots the window during a drag is a
-# pointer the window sees leave, and a drag it sees end.
-ACCELERATION = 1.24
+# Hyprland's rule for this device, by the name it lists it under: a flat
+# profile, so that a unit of motion carries the same distance whatever the
+# pace, and a sensitivity that makes the distance a quarter of a logical
+# pixel — at 0 it is one whole pixel. Set through the Lua API before the
+# device is made, and for this device alone.
+PROFILE = 'hl.device({ name = "gamut-screenshots-1", accel_profile = "flat", sensitivity = -0.75 })'
+UNIT = 0.25
 
 # Logical pixels a step of a move, at a step a frame: a drag on screen
 # that reads as a hand's, not so slow as to try the patience of a film.
-# The acceleration is the same however fast the steps come.
 PACE = 16
 
-# How near its mark `place` has to get the pointer, and the units of motion
-# it sends for the last step, with how far they carry: three units after a
-# rest go one pixel and a little, so the step always crosses into a new
-# pixel, which is what makes the window hear of it. Measured on the way,
-# since the compositor's acceleration decides it; this is the first guess.
-PLACED = 0.03
-STEP = 3
-STEP_CARRIES = 1.006
+# The units of the step that ends a glide, two pixels: the window hears of
+# the pointer only as it crosses from one whole pixel into the next, and
+# then where that event landed, so a glide's last step goes far enough
+# along its way to be sure of crossing an edge, and lands on the mark.
+LAST = 8
 
 # How many steps of two units a drag creeps from its press before it sets
-# off: nine or ten pixels, past the six the toolkit takes for a click.
+# off: half a pixel a step, seven and a half pixels an axis, past the six
+# the toolkit takes for a click.
 CREEP = 15
-
-# The units of motion that end a glide, after how long a rest, and how far
-# they were seen to carry: well over a pixel, so the move is sure to cross
-# into another. Measured on the way, as STEP's carry is; this is the first
-# guess, and a glide that lands more than SEALED off its mark for it is
-# ended again with the measure.
-SEAL_UNITS = 6
-SEAL_REST = 0.1
-SEAL_CARRIES = 5.6
-SEALED = 0.5
 
 # Lua for Hyprland that raises the pointer's position as its error.
 CURSOR_POSITION = 'local p = hl.get_cursor_pos(); error(string.format("%.4f %.4f", p.x, p.y))'
@@ -124,6 +121,7 @@ CURSOR_POSITION = 'local p = hl.get_cursor_pos(); error(string.format("%.4f %.4f
 
 class Device:
     def __init__(self):
+        subprocess.run(["hyprctl", "eval", PROFILE], capture_output=True, check=True)
         self.fd = os.open("/dev/uinput", os.O_WRONLY | os.O_NONBLOCK)
         fcntl.ioctl(self.fd, UI_SET_EVBIT, EV_KEY)
         fcntl.ioctl(self.fd, UI_SET_KEYBIT, BTN_LEFT)
@@ -136,7 +134,9 @@ class Device:
         fcntl.ioctl(self.fd, UI_DEV_SETUP, setup)
         fcntl.ioctl(self.fd, UI_DEV_CREATE)
         time.sleep(SETTLE)
-        self.seal_carries = SEAL_CARRIES
+        # Where the pointer is, asked once; every move from here is added
+        # to it, since each unit is known to carry UNIT.
+        self.at = list(self.resting())
 
     def close(self):
         time.sleep(SETTLE)
@@ -162,95 +162,61 @@ class Device:
             self.sync()
             time.sleep(pause)
 
-    def move(self, dx, dy):
-        # In steps, so that it is a drag rather than a jump: a pointer that
-        # arrives in one event is one motion event, and a drag threshold
-        # or an easing that watches the pointer's path sees nothing of it.
-        # PACE pixels a step, about a step a frame at the film's 60.
-        steps = max(1, int(max(abs(dx), abs(dy)) / PACE))
+    def move(self, ux, uy):
+        # UX, UY units of motion, in steps, so that it is a drag rather than
+        # a jump: a pointer that arrives in one event is one motion event,
+        # and a drag threshold or an easing that watches the pointer's path
+        # sees nothing of it. PACE pixels a step, about a step a frame at
+        # the film's 60.
+        if ux == 0 and uy == 0:
+            return
+        steps = max(1, int(max(abs(ux), abs(uy)) * UNIT / PACE))
         gone = [0, 0]
         for i in range(1, steps + 1):
-            to = [dx * i // steps, dy * i // steps]
+            to = [ux * i // steps, uy * i // steps]
             self.emit(EV_REL, REL_X, to[0] - gone[0])
             self.emit(EV_REL, REL_Y, to[1] - gone[1])
             self.sync()
             gone = to
             time.sleep(0.012)
+        self.at[0] += ux * UNIT
+        self.at[1] += uy * UNIT
+
+    def units(self, x, y):
+        # The units that take the pointer from where it is to X, Y: to the
+        # nearest quarter of a pixel, an eighth off the mark at worst.
+        return round((x - self.at[0]) / UNIT), round((y - self.at[1]) / UNIT)
 
     def glide(self, x, y):
-        # Motion from a mouse is accelerated by the compositor, so a move of
-        # the whole distance lands past its mark; move for the acceleration,
-        # ask where the pointer got to and move what is left, which is a
-        # smaller and so a slower move, until it is within the pixel. The
-        # only thing here that knows the pointer's place is Hyprland, and
-        # it is asked again until it gives the same answer twice, since a
-        # move is not over when its last event has been written. To the
-        # fraction is `place`.
-        #
-        # The window hears of the pointer only as it crosses from one whole
-        # pixel into the next, and then where that event landed, so after a
-        # last move of less than a pixel the window has the pointer up to a
-        # pixel from where it is. The glide therefore ends with a move it
-        # must hear: the pointer is warped back — which the window is not
-        # told of — by as far as SEAL_UNITS carry it, and sent them, which
-        # crosses a pixel's edge on the way and lands within half a pixel
-        # of the mark. Where the pointer is and where the window has it
-        # are then the same, and a drag from one such place to another
-        # pans by what the pointer moved.
-        for _ in range(12):
-            at = self.resting()
-            dx, dy = x - at[0], y - at[1]
-            if abs(dx) < 1 and abs(dy) < 1:
-                break
-            self.move(round(dx / ACCELERATION), round(dy / ACCELERATION))
-            time.sleep(0.05)
-        for _ in range(3):
-            start = (x - self.seal_carries, y - self.seal_carries)
-            self.warp(*start)
-            time.sleep(SEAL_REST)
-            self.emit(EV_REL, REL_X, SEAL_UNITS)
-            self.emit(EV_REL, REL_Y, SEAL_UNITS)
-            self.sync()
-            time.sleep(0.05)
-            at = self.resting()
-            if abs(at[0] - x) <= SEALED and abs(at[1] - y) <= SEALED:
-                return
-            self.seal_carries = at[0] - start[0]
+        # To the mark at `move`'s pace, all but the last step, which is
+        # LAST units along the way, sent as one event. The window hears of
+        # the pointer only as it crosses from one whole pixel into the next,
+        # and then where that event landed, so after a last move of less
+        # than a pixel the window has the pointer up to a pixel from where
+        # it is; the last step here is long enough to cross an edge on
+        # whichever axis it mostly goes along, so the window hears it and
+        # has the pointer where it stopped. A mark within the last step's
+        # length is backed away from by the difference first, and a mark
+        # under the pointer already is stepped away from and back.
+        ux, uy = self.units(x, y)
+        length = math.hypot(ux, uy)
+        if length == 0:
+            lx = ly = round(LAST / math.sqrt(2))
+        else:
+            lx, ly = round(ux * LAST / length), round(uy * LAST / length)
+        self.move(ux - lx, uy - ly)
+        time.sleep(0.012)
+        self.emit(EV_REL, REL_X, lx)
+        self.emit(EV_REL, REL_Y, ly)
+        self.sync()
+        self.at[0] += lx * UNIT
+        self.at[1] += ly * UNIT
 
     def place(self, x, y):
-        # The window is told where the pointer is only when the whole pixel
-        # it is in changes, and then it is told the exact place of the event
-        # that changed it: the pointer may then creep a third of a pixel at
-        # a time to anywhere within the pixel, and the window still has it
-        # where it crossed in. So the mark is reached by crossing into it
-        # with the last event: the pointer is warped — which sets its place
-        # exactly, and which the window is not told of — to just under a
-        # pixel short of the mark, rested until the acceleration has
-        # forgotten it moved, and sent STEP units, which carry it a whole
-        # pixel and a little, over the pixel's edge and onto the mark. How
-        # far the units carry is measured from the first try, and a second
-        # try uses the measure.
-        carries = [STEP_CARRIES, STEP_CARRIES]
-        for _ in range(4):
-            start = (x - carries[0], y - carries[1])
-            self.warp(*start)
-            time.sleep(0.3)
-            self.emit(EV_REL, REL_X, STEP)
-            self.emit(EV_REL, REL_Y, STEP)
-            self.sync()
-            time.sleep(0.15)
-            at = self.position()
-            if abs(at[0] - x) <= PLACED and abs(at[1] - y) <= PLACED:
-                return
-            carries = [at[0] - start[0], at[1] - start[1]]
-        sys.exit(f"the pointer could not be placed at {x}, {y}: it is at {at}")
-
-    def warp(self, x, y):
-        subprocess.run(
-            ["hyprctl", "eval", f"hl.dispatch(hl.dsp.cursor.move({{ x = {x}, y = {y} }}))"],
-            capture_output=True,
-            check=True,
-        )
+        # The same motion: the name is for the scripts, which say `place`
+        # where the pixel under the pointer is what matters, as at the two
+        # corners of `region`'s box.
+        self.glide(x, y)
 
     def resting(self):
         last = None
@@ -278,28 +244,24 @@ class Device:
     def drag(self, dx, dy):
         self.button(True)
         time.sleep(0.05)
-        self.move(dx, dy)
+        self.move(round(dx / UNIT), round(dy / UNIT))
         time.sleep(0.05)
         self.button(False)
 
     def drag_to(self, x, y, placed=False):
-        # A drag as long as a region's diagonal is accelerated like any
-        # other motion and would end well past its mark; this one is a
-        # glide with the button down, so it ends where it was told to —
-        # and, for a drag that is to end on a given pixel of the picture,
-        # `place` then puts it on the mark to the hundredth. The button
-        # stays down a while after that, so that the window has drawn a
-        # frame with the pointer at its mark before the frame that ends the
-        # drag: a toolkit takes the drag's end from the last frame it was
-        # dragging on, and a motion that arrives in the same frame as the
-        # release is not part of it. A drag that pans can lose that last
-        # motion and be none the worse, so it waits less.
+        # A glide with the button down, to a point in the layout rather
+        # than by a distance. The button stays down a while after it
+        # arrives, so that the window has drawn a frame with the pointer at
+        # its mark before the frame that ends the drag: a toolkit takes the
+        # drag's end from the last frame it was dragging on, and a motion
+        # that arrives in the same frame as the release is not part of it.
+        # A drag that is to end on a given pixel of the picture waits
+        # longer for that frame than one that pans, which can lose the
+        # last motion and be none the worse.
         self.button(True)
         time.sleep(0.05)
         self.creep(x, y)
         self.glide(x, y)
-        if placed:
-            self.place(x, y)
         time.sleep(0.3 if placed else 0.1)
         self.button(False)
 
@@ -310,16 +272,25 @@ class Device:
         # part of the drag. A stroke that sets off at speed loses its first
         # eight pixels or so that way, and the picture ends up that much
         # short of where the pointer took it. So the first pixels are
-        # covered two units at a time, two thirds of a pixel each, until
-        # the pointer is well past the toolkit's distance, and what the
-        # deciding frame loses is a fraction of a pixel.
-        start = self.position()
-        sx = 2 if x > start[0] else -2
-        sy = 2 if y > start[1] else -2
+        # covered two units at a time, half a pixel each, until the pointer
+        # is well past the toolkit's distance, and what the deciding frame
+        # loses is a fraction of a pixel. An axis with less than that to go
+        # creeps only as far as its mark.
+        ux, uy = self.units(x, y)
+        sx = max(-2, min(2, ux))
+        sy = max(-2, min(2, uy))
         for _ in range(CREEP):
+            if sx == 0 and sy == 0:
+                return
             self.emit(EV_REL, REL_X, sx)
             self.emit(EV_REL, REL_Y, sy)
             self.sync()
+            self.at[0] += sx * UNIT
+            self.at[1] += sy * UNIT
+            ux -= sx
+            uy -= sy
+            sx = max(-2, min(2, ux))
+            sy = max(-2, min(2, uy))
             time.sleep(0.008)
 
     def click(self):
@@ -373,7 +344,14 @@ def main(argv):
                     device.key(chord)
                 case _:
                     sys.exit(__doc__)
-            print("%.2f %.2f" % device.resting())
+            # Where the compositor says the pointer is, which the sum
+            # should agree with; a difference means the profile was not
+            # applied, or the pointer met the edge of a screen.
+            at = device.resting()
+            if abs(at[0] - device.at[0]) > 0.05 or abs(at[1] - device.at[1]) > 0.05:
+                print("the pointer is at %.2f %.2f, not %.2f %.2f as the units sent add up to"
+                      % (*at, *device.at), file=sys.stderr)
+            print("%.2f %.2f" % at)
     finally:
         device.close()
 

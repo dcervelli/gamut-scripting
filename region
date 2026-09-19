@@ -55,11 +55,10 @@ H=$2
 # the program does, which is at the picture's edges and no further.
 #
 # `pixel` is given to the hundredth, and the pointer is put there with
-# `place` rather than `glide`: a glide's last small steps are not heard by
-# the window, and what it has for the pointer's place can be a third of a
-# pixel off, which at this zoom is most of an image pixel. `under` asks
-# the program which image pixel it takes a placed pointer to be over, in
-# case the sums here and its own differ by a pixel.
+# `place`, which lands within an eighth of a pixel: at this zoom an image
+# pixel is half a logical one, so `under` asks the program which image
+# pixel it takes a placed pointer to be over, in case the sums here and
+# its own differ by a pixel.
 view() {
     geometry=$(window geometry)
     awk -v W="$W" -v H="$H" -v geometry="$geometry" -v bar=30 \
@@ -226,7 +225,7 @@ sleep 0.5
 
 keys x
 sleep 0.3
-gesture glide $begin -- place $begin -- drag_to $end placed
+gesture place $begin -- drag_to $end placed
 sleep 0.3
 
 # Each edge's handle sits on the middle of that edge, and the edges move as

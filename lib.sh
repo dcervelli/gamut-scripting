@@ -217,14 +217,11 @@ glide() {
     gesture glide "$1" "$2"
 }
 
-# Put the pointer at a point in the layout to the hundredth of a logical
-# pixel, as the window sees it: for the start of a drag that is to begin
-# on a given pixel of the picture. `glide` gets the pointer within a fifth
-# of a pixel, and that would do, but the window is told where the pointer
-# is only as it crosses from one whole pixel to the next, and then the
-# exact place of that crossing; the last of a glide's small steps are not
-# heard, and where the window has the pointer is wherever it crossed in.
-# `place` ends with a crossing that lands on the mark: see device.py.
+# Put the pointer at a point in the layout, as the window sees it: for the
+# start of a drag that is to begin on a given pixel of the picture. The
+# same motion as `glide`, which lands within an eighth of a pixel and ends
+# on a step the window is sure to hear — see device.py — under a name
+# that says the pixel under the pointer is what matters.
 place() {
     gesture place "$1" "$2"
 }
@@ -271,11 +268,11 @@ scale() {
 #   wheel -20 3      a slow turn, for reading what scrolls past
 #   drag 50 0        a handle pulled a short way
 #   drag_to X Y      the picture dragged to bring a point of it somewhere,
-#                    however far: a long drag is accelerated like a glide,
-#                    and this one corrects for it the way `glide` does
+#                    however far: a glide with the button held
 #   drag_to X Y placed
-#                    a box drawn out to a given pixel: the drag ends with
-#                    `place`, so that the window has the pointer exactly
+#                    a box drawn out to a given pixel: the button is held
+#                    a while longer at the end, so that the window has
+#                    drawn the pointer at its mark before it is let go
 wheel() {
     gesture wheel "$@"
 }
