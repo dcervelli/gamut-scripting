@@ -28,6 +28,8 @@ A key from here is the real keycode, read under the real keymap.
                                and is placed there, if asked, before it is let go
     device.py click            the left button pressed and released
     device.py key CHORD        a key by its position, with modifiers: 2, shift+2, ctrl+shift+c
+    device.py rest S [T]       nothing, for S seconds, or for somewhere between S and T:
+                               a hand that pauses between two things
 
 Several of these, separated by `--`, are done in turn by the one device:
 `device.py glide 400 300 -- click -- key down -- key down` is a hand that
@@ -39,9 +41,9 @@ between two of them.
 Motion is sent in units, and the compositor is told to make each unit of
 this device exactly a quarter of a logical pixel, at any pace: a flat
 acceleration profile, for this device alone, so that the pointer's place
-is arithmetic — where it started plus the units sent, over four — and is
-asked of the compositor once, when the device is made. The real mouse
-keeps its own acceleration.
+is arithmetic — where it started plus the units sent, over four. It is
+asked of the compositor once when the device is made, and once more at
+the end, to check the sum. The real mouse keeps its own acceleration.
 
 /dev/uinput has to be writable by the user; Omarchy grants that through an
 ACL, and `getfacl /dev/uinput` says whether it has.
@@ -50,6 +52,7 @@ ACL, and `getfacl /dev/uinput` says whether it has.
 import fcntl
 import math
 import os
+import random
 import struct
 import subprocess
 import sys
@@ -100,15 +103,35 @@ SETTLE = 0.2
 PROFILE = 'hl.device({ name = "gamut-screenshots-1", accel_profile = "flat", sensitivity = -0.75 })'
 UNIT = 0.25
 
-# Logical pixels a step of a move, at a step a frame: a drag on screen
-# that reads as a hand's, not so slow as to try the patience of a film.
+# Logical pixels a step of a move, at a step a frame, taken over the
+# move: a drag on screen that reads as a hand's, not so slow as to try
+# the patience of a film. A hand sets off and stops gently, so the steps
+# are not even: this much of the move follows an S-curve and the rest is
+# spread evenly, which makes the first and last steps about a third of
+# PACE and the middle ones a third more. At 0 every step would be PACE;
+# at 1 the first and last would be nothing.
 PACE = 16
+EASE = 0.7
+
+# The least a key press waits before the next, and the most: a hand does
+# not press a key ten times at a metronome's beat.
+KEY_GAP = (0.0, 0.02)
 
 # The units of the step that ends a glide, two pixels: the window hears of
 # the pointer only as it crosses from one whole pixel into the next, and
 # then where that event landed, so a glide's last step goes far enough
 # along its way to be sure of crossing an edge, and lands on the mark.
 LAST = 8
+
+# How long the window takes to have drawn a frame with the pointer where
+# it is, two frames at the film's 60. A glide waits this long before
+# anything is done where it ended, since a click on a handle is a click
+# on whichever handle the window last drew the pointer over, and a drag's
+# press is at wherever it last drew it; and the button is up this long
+# before the pointer moves on, since a toolkit counts a click only if the
+# pointer is still on the widget in the frame the button came up, and
+# takes motion in the frame of a drag's release as part of the drag.
+HEARD = 0.035
 
 # How many steps of two units a drag creeps from its press before it sets
 # off: half a pixel a step, seven and a half pixels an axis, past the six
@@ -166,14 +189,16 @@ class Device:
         # UX, UY units of motion, in steps, so that it is a drag rather than
         # a jump: a pointer that arrives in one event is one motion event,
         # and a drag threshold or an easing that watches the pointer's path
-        # sees nothing of it. PACE pixels a step, about a step a frame at
-        # the film's 60.
+        # sees nothing of it. PACE pixels a step on average, about a step a
+        # frame at the film's 60, eased in and out by EASE.
         if ux == 0 and uy == 0:
             return
         steps = max(1, int(max(abs(ux), abs(uy)) * UNIT / PACE))
         gone = [0, 0]
         for i in range(1, steps + 1):
-            to = [ux * i // steps, uy * i // steps]
+            t = i / steps
+            f = (1 - EASE) * t + EASE * t * t * (3 - 2 * t)
+            to = [ux, uy] if i == steps else [round(ux * f), round(uy * f)]
             self.emit(EV_REL, REL_X, to[0] - gone[0])
             self.emit(EV_REL, REL_Y, to[1] - gone[1])
             self.sync()
@@ -205,12 +230,12 @@ class Device:
         else:
             lx, ly = round(ux * LAST / length), round(uy * LAST / length)
         self.move(ux - lx, uy - ly)
-        time.sleep(0.012)
         self.emit(EV_REL, REL_X, lx)
         self.emit(EV_REL, REL_Y, ly)
         self.sync()
         self.at[0] += lx * UNIT
         self.at[1] += ly * UNIT
+        time.sleep(HEARD)
 
     def place(self, x, y):
         # The same motion: the name is for the scripts, which say `place`
@@ -240,6 +265,8 @@ class Device:
     def button(self, down):
         self.emit(EV_KEY, BTN_LEFT, 1 if down else 0)
         self.sync()
+        if not down:
+            time.sleep(HEARD)
 
     def drag(self, dx, dy):
         self.button(True)
@@ -250,19 +277,20 @@ class Device:
 
     def drag_to(self, x, y, placed=False):
         # A glide with the button down, to a point in the layout rather
-        # than by a distance. The button stays down a while after it
-        # arrives, so that the window has drawn a frame with the pointer at
-        # its mark before the frame that ends the drag: a toolkit takes the
-        # drag's end from the last frame it was dragging on, and a motion
-        # that arrives in the same frame as the release is not part of it.
-        # A drag that is to end on a given pixel of the picture waits
-        # longer for that frame than one that pans, which can lose the
-        # last motion and be none the worse.
+        # than by a distance. The glide ends with the frames the window
+        # takes to draw the pointer at its mark, and the button comes up
+        # after them: a toolkit takes the drag's end from the last frame it
+        # was dragging on, and a motion that arrives in the same frame as
+        # the release is not part of it. A drag that is to end on a given
+        # pixel of the picture, which a pan could miss the last step of and
+        # be none the worse, holds a while longer to be sure. The press is
+        # a frame before the creep for the same reason, the other way about.
         self.button(True)
-        time.sleep(0.05)
+        time.sleep(0.02)
         self.creep(x, y)
         self.glide(x, y)
-        time.sleep(0.3 if placed else 0.1)
+        if placed:
+            time.sleep(0.1)
         self.button(False)
 
     def creep(self, x, y):
@@ -309,6 +337,7 @@ class Device:
             self.emit(EV_KEY, code, 0)
             self.sync()
             time.sleep(0.02)
+        time.sleep(random.uniform(*KEY_GAP))
 
 
 def main(argv):
@@ -342,16 +371,21 @@ def main(argv):
                     device.click()
                 case ["key", chord]:
                     device.key(chord)
+                case ["rest", seconds]:
+                    time.sleep(float(seconds))
+                case ["rest", least, most]:
+                    time.sleep(random.uniform(float(least), float(most)))
                 case _:
                     sys.exit(__doc__)
-            # Where the compositor says the pointer is, which the sum
-            # should agree with; a difference means the profile was not
-            # applied, or the pointer met the edge of a screen.
-            at = device.resting()
-            if abs(at[0] - device.at[0]) > 0.05 or abs(at[1] - device.at[1]) > 0.05:
-                print("the pointer is at %.2f %.2f, not %.2f %.2f as the units sent add up to"
-                      % (*at, *device.at), file=sys.stderr)
-            print("%.2f %.2f" % at)
+            print("%.2f %.2f" % tuple(device.at))
+        # Where the compositor says the pointer is, which the sum should
+        # agree with; a difference means the profile was not applied, or
+        # the pointer met the edge of a screen. Asked once at the end:
+        # asked after each action it would be a pause between them.
+        at = device.resting()
+        if abs(at[0] - device.at[0]) > 0.05 or abs(at[1] - device.at[1]) > 0.05:
+            print("the pointer is at %.2f %.2f, not %.2f %.2f as the units sent add up to"
+                  % (*at, *device.at), file=sys.stderr)
     finally:
         device.close()
 

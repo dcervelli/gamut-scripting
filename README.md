@@ -123,15 +123,16 @@ makes every unit exactly a quarter of a logical pixel however fast it is
 sent. Where the pointer is then is arithmetic: where it was when the
 device was made, asked of the compositor once, plus the units sent over
 four. A glide is the units that take it to its mark, at a pace of sixteen
-pixels a frame, and it lands within an eighth of a pixel. `drag_to` is the
-same with the button held.
+pixels a frame taken over the move — eased, so that it sets off and stops
+gently as a hand does — and it lands within an eighth of a pixel. `drag_to`
+is the same with the button held.
 
 The pointer's place is a fraction, and `hyprctl cursorpos` cuts the
 fraction off; the Lua API has it whole, and since `hyprctl eval` prints
 nothing a script returns and only what it raises, `device.py` raises the
 position and reads it off the error. It is read once, when the device is
-made, and again after each action to be printed, where it is checked
-against the sum.
+made, and once more at the end, to check the sum; asked after each action
+it would be a pause between them.
 
 Where the pointer is and where the window has it are two things. The
 compositor tells the window of a motion only when the whole logical pixel
@@ -163,12 +164,20 @@ before the recorder starts.
 Several of the device's actions are done as one hand's `gesture`, the
 device made once and the actions given to it in a row, separated by `--`:
 the glide to a handle, the click that takes it, the drag that brings the
-next part of the picture into view, the arrows that bring the edge in.
-`device.py` prints where the pointer was after each, so `strokes` and `stage`
-can move their model of the view on by what the pointer was really seen to
-move — within a pixel of what was asked, but not on it, and a few strokes'
-worth of that is a handle missed. A pan too long for one stroke inside the
-window is broken into two or three.
+next part of the picture into view, the arrows that bring the edge in, a
+`rest` where a hand would pause. The whole of `region`'s film is one such
+gesture, planned on the script's own model of the view, which the exact
+motion lets it trust: a device made for each stage was most of a second
+of the pointer sitting still between them. A pan too long for one stroke
+inside the window is broken into two or three.
+
+What the window makes of a click or a drag is decided a frame at a time,
+so the device gives it two frames where the order of things matters: after
+a glide, before the click or press there, since a click on a handle is a
+click on whichever handle the window last drew the pointer over; and after
+the button comes up, before the pointer moves on, since a click counts only
+if the pointer is still on the widget in that frame, and motion in the
+frame a drag is released is taken as part of the drag.
 
 The desk hides the pointer when a key is pressed, and tells the window it
 has left, which takes down whatever was up because the pointer was over
