@@ -1,7 +1,9 @@
 #!/bin/sh
 # The README's file chooser: a directory of several hundred pictures in a
-# 1000x600 window, Ctrl+P, a few letters typed and one chosen; then Ctrl+P
-# again and a file asked for by its number.
+# 1000x600 window, the counter at the head of the top bar pressed to open
+# the chooser, a few letters typed and one chosen; then Ctrl+P and a file
+# asked for by its number, typed slowly enough to be read. The pointer is
+# in the film for the press.
 #
 #   ./fuzzy_finder            on images/birds
 #   ./fuzzy_finder DIR        on another directory
@@ -10,16 +12,29 @@
 
 open 1000 600 "${1:-$ROOT/images/birds}"
 
-record "fuzzy_finder.mp4"
+record "fuzzy_finder.mp4" cursor
 started=$(since_record)
-press ctrl+p
+sleep 0.5
+
+set -- $(window geometry)
+# The counter sits between the two chevrons at the head of the top bar, on
+# the bar's centerline; 45 across is inside it whatever the count.
+glide $(($1 + 45)) $(($2 + 15))
+sleep 0.3
+click
 sleep 1
+# The letters a little slower than a burst, the number slow enough to be
+# read digit by digit.
+PACE=0.15
 keys g y r
 sleep 1
+unset PACE
 keys Return
 sleep 1
 press ctrl+p
+PACE=0.3
 keys colon 4 0 0
+unset PACE
 sleep 1
 keys Return
 sleep 1

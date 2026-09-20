@@ -367,7 +367,8 @@ press() {
 # One wtype call per key, because wtype grows its keymap as it meets new
 # keysyms and sends the compositor each revision, and a key pressed under a
 # keymap the window has not read yet lands as whatever that keycode was
-# under the last one.
+# under the last one. The keys come 0.05 s apart, or PACE seconds apart
+# where a script sets it, for typing that is meant to be read as it goes in.
 keys() {
     keyboard
     for key; do
@@ -385,7 +386,7 @@ keys() {
             released="-m $mod $released"
         done
         wtype $held -k "$key" $released
-        sleep 0.05
+        sleep "${PACE:-0.05}"
     done
 }
 
@@ -425,8 +426,8 @@ text() {
     gesture ${actions%--}
 }
 
-# Hold a key down for SECONDS, named as `keys` names them: `hold w 1` for
-# the clipping paint, which is on the picture only while the key is.
+# Hold a key down for SECONDS, named as `keys` names them: `hold Right 1`
+# for a pan that goes on as long as the key does.
 hold() {
     keyboard
     wtype -P "$1" -s "$(awk -v s="$2" 'BEGIN { print int(s * 1000) }')" -p "$1"

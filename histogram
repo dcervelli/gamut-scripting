@@ -3,12 +3,13 @@
 # button in the right strip pressed, the black handle on the band dragged
 # in from the left and the white handle in from the right, so that the
 # window is narrower than the picture's range and both corners of the plot
-# say how much is being thrown away, then `w` held for a second to paint
-# the clipped pixels on the picture itself: blue where it has gone black,
-# red where it has gone white, with the pointer brought back over the
-# picture first so that the handle's tooltip is not over the panel while
-# the paint is on. The pointer is in the film, since where it goes is the
-# point, and it moves as a hand would, through device.py.
+# say how much is being thrown away, then the button beside the band
+# pressed to paint the clipped pixels on the picture itself: blue where it
+# has gone black, red where it has gone white, with the pointer brought
+# over the picture so that the button's tooltip is not over the panel
+# while the paint is on, and the button pressed again to take the paint
+# off. The pointer is in the film, since where it goes is the point, and
+# it moves as a hand would, through device.py.
 #
 #   ./histogram            on images/mora/mora.jpg
 #   ./histogram FILE       on another picture
@@ -45,9 +46,21 @@ sleep 0.3
 drag -50 0
 sleep 0.8
 
-glide $(($1 + $3 / 2)) $(($2 + $4 * 2 / 3))
-sleep 0.5
-hold w 1
+# The marks button is the one beside the band, at the foot of the strip
+# down the panel's left: a panel's inset in from the panel's edge, and
+# centered on the band. It is a toggle, lit while the marks are on.
+marks_x=$(($1 + 671))
+picture_x=$(($1 + $3 / 2))
+picture_y=$(($2 + $4 * 2 / 3))
+glide "$marks_x" "$band_y"
+sleep 0.3
+click
+glide "$picture_x" "$picture_y"
+sleep 1.5
+glide "$marks_x" "$band_y"
+sleep 0.3
+click
+glide "$picture_x" "$picture_y"
 sleep 1
 film=$(cut)
 close

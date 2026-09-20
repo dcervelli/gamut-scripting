@@ -1,9 +1,9 @@
 #!/bin/sh
-# The README's pixel grid: a landscape in a 1000x600 window with the grid
-# on, the wheel turned over the stag until the grid is down to single
-# pixels, a beat, and Space to fit the whole picture again. The wheel is
-# device.py's, and the pointer is in the film, since what it is over is the
-# point.
+# The README's pixel grid: a landscape in a 1000x600 window, the grid
+# toggle clicked on, the wheel turned over the stag until the grid is down
+# to single pixels, a beat, and Space to fit the whole picture again. The
+# mouse is device.py's, and the pointer is in the film, since what it is
+# over is the point.
 #
 #   ./pixel_grid            on images/0-winding-road.webp
 #   ./pixel_grid FILE X Y   on another picture, zooming into pixel X, Y
@@ -16,21 +16,27 @@ y=${3:-2172}
 set -- $(magick identify -format '%w %h' "$file")
 
 open 1000 600 "$file"
-keys g
 record "pixel_grid.mp4" cursor
 started=$(since_record)
 sleep 0.3
-cursor $(fitted "$1" "$2" "$x" "$y")
-sleep 0.3
+# The grid toggle heads the bottom bar: a bar's padding in from the left
+# edge, on the bar's centerline.
+set -- "$1" "$2" $(window geometry)
+glide $(($3 + 15)) $(($4 + $6 - 15))
+sleep 0.5
+click
+sleep 0.8
+glide $(fitted "$1" "$2" "$x" "$y")
+sleep 0.5
 # Twenty-five notches from a fit of a quarter is past the zoom ceiling, and
 # the grid is at one pixel from about 5700% on.
 wheel 25
-# The last notch's motion has 200 ms to run, and the pause is 400 ms; the
+# The last notch's motion has 200 ms to run, and the pause is 1.2 s; the
 # wheel already waited 400 ms for its device to drain.
-sleep 0.2
+sleep 1.0
 keys space
 settle
-sleep 0.8
+sleep 1.2
 film=$(cut)
 close
 gif "$film" "pixel_grid.gif" 800 "$started"

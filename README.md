@@ -18,9 +18,9 @@ is what changes the picture there.
 | `info` | an elevation model in turbo with the information panel up, at 50% |
 | `compare` | the three rasters of one mountain flipped through, the wheel rolled into the crater on the way |
 | `false_color` | the hillshade held over the crater, `r` pressed through the four color maps |
-| `fuzzy_finder` | Ctrl+P over a directory of several hundred pictures: one chosen by a few letters, one by its number |
+| `fuzzy_finder` | the chooser over a directory of several hundred pictures, opened from the counter at the head of the top bar and one picture chosen by a few letters, then opened again with Ctrl+P and one asked for by its number, typed slowly |
 | `themes` | the photograph with the information panel open, on Tokyo Night, then on Gruvbox once the desk is switched to it, the two stills flipped between every two seconds |
-| `histogram` | the photograph with the histogram opened from its button, the black and white handles on the band each dragged a fifth of the way in, and `w` held for a second to paint the clipped pixels |
+| `histogram` | the photograph with the histogram opened from its button, the black and white handles on the band each dragged a fifth of the way in, and the button beside the band pressed to paint the clipped pixels, then pressed again to take the paint off |
 | `ui` | the directory of the mountain's four rasters, the pointer held on the counter at the head of the top bar for its tooltip, the help button at the foot of the right strip pressed and the table of keys scrolled to its end over three seconds, Esc, and the button at the end of the top bar pressed to hide the interface |
 | `mandelbrot` | a PNG that a program rewrites every second, one step further into the Mandelbrot set, watched for ten seconds: zoomed four steps into the middle and panned once around it partway, then Space |
 | `region` | a web page's screenshot, `x` pressed and a box dragged out ten pixels loose around the wordmark, the wheel turned five notches in over the handle on its left edge, the handle clicked and Right pressed until the edge meets the first letter, the picture dragged to bring the top, right and bottom handles into view in turn and each brought in the same way, then Ctrl+C and Ctrl+V, so that the copy is pasted and shown, cut to the pixel |
