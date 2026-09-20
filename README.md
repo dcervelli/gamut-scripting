@@ -1,10 +1,12 @@
 # gamut-scripting
 
 The scripts that take [gamut](https://github.com/dcervelli/gamut)'s
-pictures: one script per picture in its `user-docs/screenshots/`, so that a
-picture can be taken again after the interface changes and come out the
-same size, in the same place, showing the same thing. What each one shows
-is the script.
+pictures, and the pictures themselves: one script per picture in
+`screenshots/`, so that a picture can be taken again after the interface
+changes and come out the same size, in the same place, showing the same
+thing. What each one shows is the script. gamut's README links to the
+pictures here rather than carrying them, so taking one again and pushing it
+is what changes the picture there.
 
 | script | picture |
 | --- | --- |
@@ -23,7 +25,7 @@ is the script.
 | `region` | a web page's screenshot, `x` pressed and a box dragged out ten pixels loose around the wordmark, the wheel turned five notches in over the handle on its left edge, the handle clicked and Right pressed until the edge meets the first letter, the picture dragged to bring the top, right and bottom handles into view in turn and each brought in the same way, then Ctrl+C and Ctrl+V, so that the copy is pasted and shown, cut to the pixel |
 
 ```sh
-./main_screenshot                       # ~/git/gamut/user-docs/screenshots/main_screenshot.jpg
+./main_screenshot                       # screenshots/main_screenshot.jpg
 GAMUT=~/build/gamut ./compare           # with another binary
 SCREENSHOTS=/tmp/shots ./false_color    # to another directory
 ./all                                   # every one of them, in the order above
@@ -34,7 +36,7 @@ Three things are the environment's to say, each with a default:
 | variable | what | default |
 | --- | --- | --- |
 | `GAMUT` | the binary to drive | `~/git/gamut/target/release/gamut` |
-| `SCREENSHOTS` | where the pictures go | `~/git/gamut/user-docs/screenshots` |
+| `SCREENSHOTS` | where the pictures go | `screenshots/` here |
 | `FILMS` | where the recordings go before they are GIFs | `films/` here, ignored by git |
 
 The pictures they open are in `images/`: the four rasters of one mountain

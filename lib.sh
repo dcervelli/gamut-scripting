@@ -25,7 +25,7 @@
 # Three things are the environment's to say, each with a default:
 #
 #   GAMUT         the binary to drive        ~/git/gamut/target/release/gamut
-#   SCREENSHOTS   where the pictures go      ~/git/gamut/user-docs/screenshots
+#   SCREENSHOTS   where the pictures go      screenshots/ beside this file
 #   FILMS         where the recordings go    films/ beside this file, ignored by git
 #
 # The window opens on whatever workspace is active, so the script is for a
@@ -37,7 +37,7 @@ set -eu
 ROOT=$(cd "$(dirname "$0")" && pwd)
 CLASS=com.dcervelli.gamut
 GAMUT=${GAMUT:-$HOME/git/gamut/target/release/gamut}
-SCREENSHOTS=${SCREENSHOTS:-$HOME/git/gamut/user-docs/screenshots}
+SCREENSHOTS=${SCREENSHOTS:-$ROOT/screenshots}
 FILMS=${FILMS:-$ROOT/films}
 
 for tool in hyprctl jq wtype grim magick gpu-screen-recorder ffmpeg python3; do
