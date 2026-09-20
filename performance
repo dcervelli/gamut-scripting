@@ -1,0 +1,61 @@
+#!/bin/sh
+# The README's timing: a fresh terminal and the window it opens, side by
+# side and 500x600 each, so that the numbers `--timing` prints are in the
+# picture with the window they describe. The command is typed at the
+# prompt before the film starts, and the film is Return pressed, the window
+# coming up on the right, and the timing marks arriving on the left as the
+# file is decoded and its first frame shown, held for a few seconds once
+# the picture is up.
+#
+# The terminal is ghostty's, as a process of its own, on a shell with no
+# rc file and a bare prompt; `gamut` at that prompt is the binary under
+# test, found first on the shell's PATH under that name. Its window is
+# placed by `spawn`, as gamut's is elsewhere; gamut's here is started by
+# the shell, and so is placed by a rule set beforehand and taken away
+# after.
+#
+#   ./performance           on ~/Downloads/swiss-map-raster50_2007_285_krel_2.5_2056.tif
+#   ./performance FILE      on another
+
+. "$(dirname "$0")/lib.sh"
+
+file=${1:-$HOME/Downloads/swiss-map-raster50_2007_285_krel_2.5_2056.tif}
+[ -r "$file" ] || { echo "no file at $file" >&2; exit 1; }
+command -v ghostty >/dev/null || { echo "ghostty is not installed" >&2; exit 1; }
+
+# What the shell runs on `gamut`.
+mkdir -p "$FILMS/bin"
+ln -sf "$GAMUT" "$FILMS/bin/gamut"
+
+# The two windows as one 1000x600 rectangle, the terminal on the left.
+set -- $(placement 1000 600)
+rule "match = { class = \"^$CLASS\$\" }, float = true, size = \"500 600\", move = { \"$(($1 + 500))\", \"$2\" }, opacity = \"1 1\", border_size = 0"
+spawn org.gamut_scripting.terminal 500 600 "$1" "$2" \
+    "ghostty --class=org.gamut_scripting.terminal --gtk-single-instance=false --font-size=12 \
+        -e env PS1='\$ ' PATH=$(shell_quote "$FILMS/bin"):\$PATH bash --norc --noprofile"
+TERMINAL=$WINDOW
+set -- $(window geometry)
+FRAME="$1 $2 1000 600"
+# The prompt, before anything is typed at it.
+sleep 1
+
+park
+text "gamut --timing $(printf '%s' "$file" | sed "s|^$HOME/|~/|")"
+sleep 0.5
+
+before=$(windows)
+record "performance.mp4"
+# The command, read before it runs.
+sleep 1
+keys Return
+
+# The window the shell started, and the file on screen in it.
+arrived "$CLASS" "$before"
+loaded
+sleep 3
+film=$(cut)
+
+close
+WINDOW=$TERMINAL
+close
+gif "$film" "performance.gif" 800

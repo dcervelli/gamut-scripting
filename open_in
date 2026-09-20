@@ -1,0 +1,23 @@
+#!/bin/sh
+# The README's "Open in…" menu: a photograph in a 1000x600 window, the
+# open button — second in the left strip, under the copy button — pressed,
+# and the menu of what else on this desk will open the file left standing
+# beside it. What the menu lists is whatever the desktop has installed for
+# a JPEG, so the picture is of this desk's.
+#
+#   ./open_in            on images/mora/mora.jpg
+#   ./open_in FILE       on another file
+
+. "$(dirname "$0")/lib.sh"
+
+open 1000 600 "${1:-$ROOT/images/mora/mora.jpg}"
+
+set -- $(window geometry)
+# The strip's buttons are 22 square, 4 under the top bar and 8 apart, so
+# the second is centered 75 down from the window's top, across the strip.
+glide $(($1 + 15)) $(($2 + 75))
+sleep 0.3
+click
+sleep 0.5
+shoot "open_in.jpg"
+close

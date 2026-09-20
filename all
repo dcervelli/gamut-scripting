@@ -11,8 +11,8 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")" && pwd)
 
-for script in main_screenshot animated pixel_grid pixel_copy info compare \
-    false_color fuzzy_finder themes histogram mandelbrot ui region; do
+for script in main_screenshot animated pixel_grid pixel_copy open_in info compare \
+    false_color fuzzy_finder themes histogram mandelbrot ui region performance; do
     echo "== $script"
     "$ROOT/$script" || { echo "$script failed" >&2; exit 1; }
 done

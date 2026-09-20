@@ -51,6 +51,8 @@ done
 cleanup() {
     [ -z "${RECORDER:-}" ] || kill -INT "$RECORDER" 2>/dev/null || true
     [ -z "${WINDOW:-}" ] || kill "$(window pid)" 2>/dev/null || true
+    [ -z "${SPAWNED:-}" ] || kill $SPAWNED 2>/dev/null || true
+    [ -z "${RULE:-}" ] || hyprctl eval "hl.window_rule({ name = \"$RULE\", enabled = false })" >/dev/null
     [ -z "${POINTER_HIDDEN:-}" ] || hyprctl eval "hl.config({ cursor = { hide_on_key_press = $POINTER_HIDDEN } })" >/dev/null
 }
 trap cleanup EXIT
@@ -65,9 +67,10 @@ keep_pointer() {
     hyprctl eval 'hl.config({ cursor = { hide_on_key_press = false } })' >/dev/null
 }
 
-# Every gamut window the compositor knows, one address per line.
-gamut_windows() {
-    hyprctl clients -j | jq -r --arg class "$CLASS" '.[] | select(.class == $class) | .address'
+# Every window of a class the compositor knows, one address per line;
+# gamut's own class unless another is given.
+windows() {
+    hyprctl clients -j | jq -r --arg class "${1:-$CLASS}" '.[] | select(.class == $class) | .address'
 }
 
 # One field of the window this script opened: "title", "pid", or the
@@ -89,26 +92,11 @@ open() {
     height=$2
     shift 2
 
-    before=" $(gamut_windows | tr '\n' ' ') "
     command="env${ENVIRONMENT:-} $GAMUT --size $width $height"
     for path; do
         command="$command $(shell_quote "$path")"
     done
-    set -- $(placement "$width" "$height")
-    hyprctl eval "hl.exec_cmd($(lua_quote "$command"), {
-        float = true, size = \"$width $height\", move = { \"$1\", \"$2\" }, opacity = \"1 1\",
-    })" >/dev/null
-
-    # The new window is the one that was not there before.
-    WINDOW=
-    for _ in $(seq 50); do
-        WINDOW=$(gamut_windows | while read -r candidate; do
-            case "$before" in *" $candidate "*) ;; *) echo "$candidate" ;; esac
-        done | head -1)
-        [ -n "$WINDOW" ] && break
-        sleep 0.1
-    done
-    [ -n "$WINDOW" ] || { echo "gamut's window never appeared" >&2; exit 1; }
+    spawn "$CLASS" "$width" "$height" $(placement "$width" "$height") "$command"
 
     loaded
 
@@ -116,6 +104,67 @@ open() {
     # would otherwise land in whatever it was over.
     park
     sleep 0.3
+}
+
+# Start a command through the compositor with a rule set that floats its
+# window at W by H, at X, Y from the monitor's corner, at full opacity and
+# without a border, and return once a window of CLASS that was not there
+# before is on screen, in WINDOW. `open` is this for gamut, centered; a
+# script that wants another window beside gamut's — a terminal — calls it
+# for that window, with the position `placement` gives the two together.
+#
+#   spawn org.example.terminal 500 600 $X $Y "ghostty -e bash"
+#
+# The window is started by the compositor, not by this script, so what it
+# runs is one line for the compositor's shell. The border goes because it
+# is drawn outside the window's rectangle, over whatever is next to it:
+# two windows flush against each other would each wear a stripe of the
+# other's.
+spawn() {
+    before=$(windows "$1")
+    hyprctl eval "hl.exec_cmd($(lua_quote "$6"), {
+        float = true, size = \"$2 $3\", move = { \"$4\", \"$5\" }, opacity = \"1 1\", border_size = 0,
+    })" >/dev/null
+    arrived "$1" "$before"
+    SPAWNED="${SPAWNED:-} $(window pid)"
+}
+
+# Wait for a window of CLASS that is not among the addresses in BEFORE, as
+# `windows` listed them a moment ago, and leave it in WINDOW: the new
+# window is the one that was not there before.
+#
+#   before=$(windows); keys Return; arrived "$CLASS" "$before"
+arrived() {
+    WINDOW=
+    for _ in $(seq 50); do
+        WINDOW=$(windows "$1" | while read -r candidate; do
+            case " $(printf '%s\n' "$2" | tr '\n' ' ') " in
+                *" $candidate "*) ;;
+                *) echo "$candidate" ;;
+            esac
+        done | head -1)
+        [ -n "$WINDOW" ] && break
+        sleep 0.1
+    done
+    [ -n "$WINDOW" ] || { echo "the $1 window never appeared" >&2; exit 1; }
+}
+
+# A window rule for the rest of the run, for a window the compositor will
+# open that `spawn` cannot hand its rules to: one that a shell in another
+# window starts. The argument is the rule's fields as Lua, its match
+# included; the rule is turned off when the script ends.
+#
+#   rule "match = { class = \"^$CLASS\$\" }, float = true, size = \"500 600\", move = { \"$X\", \"$Y\" }"
+rule() {
+    RULE=gamut-scripting-$$
+    hyprctl eval "hl.window_rule({ name = \"$RULE\", $1 })" >/dev/null
+}
+
+# What `record`, `shoot` and `still` capture: the window's rectangle,
+# unless FRAME says another, as "x y w h" in the layout, for a picture of
+# more than the one window.
+frame() {
+    echo "${FRAME:-$(window geometry)}"
 }
 
 # Give the program a variable in its environment when `open` starts it:
@@ -340,6 +389,42 @@ keys() {
     done
 }
 
+# Type a line of text at a shell prompt, a character at a time, through
+# the device's keyboard as one gesture: a terminal reads a capital as its
+# letter with Shift held, and the real keycodes under the real keymap are
+# what it wants — wtype's one-level keymap gives it the letter and no
+# shift, and it types the small one. The characters a command line is made
+# of are named here by where they are on a US layout.
+#
+#   text 'gamut --timing ~/Downloads/map.tif'
+text() {
+    keyboard
+    actions=$(printf '%s\n' "$1" | fold -w 1 | while IFS= read -r char; do
+        echo key
+        case $char in
+            [a-z0-9]) echo "$char" ;;
+            [A-Z]) echo "shift+$(printf '%s' "$char" | tr 'A-Z' 'a-z')" ;;
+            ' ') echo space ;;
+            -) echo minus ;;
+            _) echo shift+minus ;;
+            =) echo equal ;;
+            +) echo shift+equal ;;
+            .) echo dot ;;
+            ,) echo comma ;;
+            /) echo slash ;;
+            '~') echo shift+grave ;;
+            :) echo shift+semicolon ;;
+            "'") echo apostrophe ;;
+            '"') echo shift+apostrophe ;;
+            '*') echo shift+8 ;;
+            '$') echo shift+4 ;;
+            *) echo "text: no key for '$char'" >&2; exit 1 ;;
+        esac
+        echo --
+    done)
+    gesture ${actions%--}
+}
+
 # Hold a key down for SECONDS, named as `keys` names them: `hold w 1` for
 # the clipping paint, which is on the picture only while the key is.
 hold() {
@@ -366,7 +451,7 @@ park() {
 # $SCREENSHOTS.
 shoot() {
     park
-    set -- "$SCREENSHOTS/$1" $(window geometry)
+    set -- "$SCREENSHOTS/$1" $(frame)
     grim -g "$2,$3 ${4}x$5" -t jpeg -q 92 "$1"
     echo "$1"
 }
@@ -381,7 +466,7 @@ shoot() {
 # it; the recorder scales to the monitor's own pixels itself.
 record() {
     park
-    set -- "$FILMS/$1" "${2:-no}" $(window geometry)
+    set -- "$FILMS/$1" "${2:-no}" $(frame)
     mkdir -p "$FILMS"
     rm -f "$1" "$1.ts"
     case $2 in cursor) shown=yes ;; *) shown=no ;; esac
@@ -440,7 +525,7 @@ gif() {
 # from a recording. `flipbook` makes the GIF.
 still() {
     park
-    set -- "$FILMS/$1" $(window geometry)
+    set -- "$FILMS/$1" $(frame)
     mkdir -p "$FILMS"
     grim -g "$2,$3 ${4}x$5" "$1"
     echo "$1"

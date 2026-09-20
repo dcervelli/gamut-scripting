@@ -14,6 +14,7 @@ is what changes the picture there.
 | `animated` | a GIF opened paused, then played through once with the transport bar |
 | `pixel_grid` | the grid on, the wheel rolled over the stag until the grid is at single pixels, then Space |
 | `pixel_copy` | the grid on and the wheel rolled into the mountain, the dot at the head of the readout hovered and pressed, Hex chosen, and Ctrl+. over the picture |
+| `open_in` | the photograph with the open button in the left strip pressed and the "Open in…" menu of what this desk will open it in standing beside it |
 | `info` | an elevation model in turbo with the information panel up, at 50% |
 | `compare` | the three rasters of one mountain flipped through, the wheel rolled into the crater on the way |
 | `false_color` | the hillshade held over the crater, `r` pressed through the four color maps |
@@ -23,6 +24,7 @@ is what changes the picture there.
 | `ui` | the directory of the mountain's four rasters, the pointer held on the counter at the head of the top bar for its tooltip, the help button at the foot of the right strip pressed and the table of keys scrolled to its end over three seconds, Esc, and the button at the end of the top bar pressed to hide the interface |
 | `mandelbrot` | a PNG that a program rewrites every second, one step further into the Mandelbrot set, watched for ten seconds: zoomed four steps into the middle and panned once around it partway, then Space |
 | `region` | a web page's screenshot, `x` pressed and a box dragged out ten pixels loose around the wordmark, the wheel turned five notches in over the handle on its left edge, the handle clicked and Right pressed until the edge meets the first letter, the picture dragged to bring the top, right and bottom handles into view in turn and each brought in the same way, then Ctrl+C and Ctrl+V, so that the copy is pasted and shown, cut to the pixel |
+| `performance` | a fresh terminal and the window it opens, side by side: `gamut --timing` on a 443 MB Swiss map typed at the prompt, Return, and the timing marks arriving on the left as the map comes up on the right |
 
 ```sh
 ./main_screenshot                       # screenshots/main_screenshot.jpg
@@ -45,7 +47,10 @@ GIF and the stag beside them. Each script takes another path as its first
 argument. `mandelbrot` opens no picture of ours: the program that draws its
 picture is the Rust crate in [`mandelbrot-zoom/`](mandelbrot-zoom/), which
 the script builds if `cargo build --release` has not been run there
-already, or `MANDELBROT` names another binary.
+already, or `MANDELBROT` names another binary. `performance` opens one too
+big to keep here, the 14000×9600 raster of a Swiss 1:50000 map sheet at
+`~/Downloads/swiss-map-raster50_2007_285_krel_2.5_2056.tif`, and wants
+that or another file as its argument.
 
 ## What a script does
 
@@ -93,6 +98,27 @@ the same check before they send anything; one run of `fuzzy_finder` before
 that check typed its query into a browser's print dialog. Between shots the
 pointer is parked on the middle of the top bar, the one place it shows in
 nothing.
+
+## Two windows
+
+`performance` has a terminal beside the window, since what it shows is what
+`--timing` prints. Each window of the pair is where `open` would put one
+window of their combined size, and each is 500 wide, so both start on a
+whole device pixel, and both are given `border_size = 0`: the border is
+drawn outside the window's rectangle, over whatever is next to it, so
+two windows flush against each other would each wear a stripe of the
+other's. `spawn` is what `open` does for gamut, for any command and class
+— here ghostty, as a process of its own, on a shell with no rc file and a
+bare prompt whose PATH begins with a directory holding the binary under
+test as `gamut`. The window that shell starts cannot be handed rules by
+`hl.exec_cmd`, so `rule` sets a named window rule for the run, and turns
+it off when the script ends, whichever way. `FRAME` says what `record`
+captures when it is not the one window's rectangle, and `text` types the
+command line at the prompt: through the device's keyboard, as `press`
+does, because a terminal reads a capital as its letter with Shift held,
+and under wtype's one-level keymap Shift changes nothing. The command is
+typed before the recording starts, so the film is Return, the window, and
+the numbers.
 
 `close` kills the window and then waits for the compositor to forget it.
 The next window can be given the same address, and `open` tells the new
