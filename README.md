@@ -25,6 +25,7 @@ is what changes the picture there.
 | `mandelbrot` | a PNG that a program rewrites every second, one step further into the Mandelbrot set, watched for ten seconds: zoomed four steps into the middle and panned once around it partway, then Space |
 | `region` | a web page's screenshot, `x` pressed and a box dragged out ten pixels loose around the wordmark, the wheel turned five notches in over the handle on its left edge, the handle clicked and Right pressed until the edge meets the first letter, the picture dragged to bring the top, right and bottom handles into view in turn and each brought in the same way, then Ctrl+C and Ctrl+V, so that the copy is pasted and shown, cut to the pixel |
 | `export` | the mountain's shaded relief under the viridis ramp, a box dragged out a thousand pixels square around the summit, and Export chosen from the file menu: the dialog's first size box set to 25%, and the quarter-size crop written, shown as it lands, and put at its own size |
+| `loupe` | the first of the bird plates, the loupe's toggle in the bottom bar clicked, the pointer glided onto the lower bird's eye, and `Shift+L` pressed 300 ms apart round its four magnifications and back to 4×, then the loupe glided down to the foot |
 | `performance` | a fresh terminal and the window it opens, side by side: `gamut --timing` on a 443 MB Swiss map typed at the prompt, Return, and the timing marks arriving on the left as the map comes up on the right |
 
 ```sh

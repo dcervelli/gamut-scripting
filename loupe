@@ -1,0 +1,51 @@
+#!/bin/sh
+# The README's loupe: the first of the bird plates in a 1000x600 window,
+# the loupe's toggle in the bottom bar clicked, the pointer glided onto
+# the lower bird's eye, Shift+L pressed round the magnifications —
+# 4x, 8x, 16x, 2x and back to 4x — and then, the loupe still up, the
+# pointer glided down to the bird's foot and held there a second. Shift+L
+# goes through the device's keyboard, since wtype's capital reaches the
+# window as `l` and takes the loupe down. The pointer is in the film,
+# since the loupe sits beside it and the toggle is clicked.
+#
+#   ./loupe            on images/birds
+#   ./loupe DIR X Y [FX FY]
+#                      on another directory, the loupe over pixel X, Y of its
+#                      first file, then taken to FX, FY
+
+. "$(dirname "$0")/lib.sh"
+
+dir=${1:-$ROOT/images/birds}
+x=${2:-252}
+y=${3:-627}
+fx=${4:-425}
+fy=${5:-880}
+
+open 1000 600 "$dir"
+set -- $(window title)
+set -- $(magick identify -format '%w %h' "$dir/$1")
+keep_pointer
+
+record "loupe.mp4" cursor
+started=$(since_record)
+sleep 0.5
+# The loupe's toggle is second in the bottom bar, after the grid's: 45
+# pixels in from the left edge, on the bar's centerline.
+set -- "$1" "$2" $(window geometry)
+glide $(($3 + 45)) $(($4 + $6 - 15))
+# Long enough on the button for its tooltip to come up and be read.
+sleep 1.0
+click
+sleep 0.5
+glide $(fitted "$1" "$2" "$x" "$y")
+sleep 1.0
+# The four presses are one gesture, 300 ms apart: a `press` each would
+# make a device each, and half a second of that between them.
+keyboard
+gesture key shift+l -- rest 0.3 -- key shift+l -- rest 0.3 -- key shift+l -- rest 0.3 -- key shift+l
+sleep 1.0
+glide $(fitted "$1" "$2" "$fx" "$fy")
+sleep 1
+film=$(cut)
+close
+gif "$film" "loupe.gif" 800 "$started"
