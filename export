@@ -1,0 +1,122 @@
+#!/bin/sh
+# The README's export: the mountain's shaded relief in a 1000x600 window,
+# `r` pressed once to lay the viridis ramp over it, `x` for the crosshair
+# and a box dragged out a thousand pixels square around the summit, then
+# the button before the name in the top bar pressed and Export chosen from
+# the menu it opens. The dialog comes up on a name that is free and the
+# size of the region, a thousand each way give or take the pixel the two
+# ends of the drag are read as; the first of the three size boxes is
+# clicked, its hundred selected and 25 typed over it, and the other two
+# follow to a quarter of that. Export writes the file, which joins the
+# list beside the one it came from and is shown as it lands — the region,
+# the ramp and all, cut to the pixel — and `0` puts it at its own size in
+# the middle of the window. The pointer is in the film, since where it goes
+# is the point, and it moves as a hand would, through device.py.
+#
+# The relief is the fourth of the directory's four files, so the film opens
+# on it: the three steps to it are before the recording starts, the first
+# of them reading a 38 MB elevation model. The picture is single-channel,
+# which is what false color wants; the ramp is written into the exported
+# file's pixels, so what comes back is RGB.
+#
+# The file the export writes is beside the one on screen, in the directory
+# of pictures this repository keeps. It is taken away before the take and
+# after it: nothing is ever written over, so a file left by an earlier take
+# would push the name to `-edited-2` and the film would show that, and left
+# behind it would be a fifth file in the directory the other pictures show
+# as four.
+#
+#   ./export             on images/mora
+#   ./export DIR X Y     on another directory, the box around pixel X, Y of
+#                        its fourth file
+
+. "$(dirname "$0")/lib.sh"
+
+dir=${1:-$ROOT/images/mora}
+# The summit: the highest pixel of the elevation model beside the relief,
+# and the middle of the box.
+x=${2:-2359}
+y=${3:-2355}
+side=1000
+
+# The program lists a directory in name order, and so does this.
+relief=$(LC_ALL=C ls "$dir" | sed -n 4p)
+exported="${relief%.*}-edited.png"
+
+# However the script ends, the file it wrote goes: lib.sh's own cleanup
+# first, then the export, which is a file in someone's pictures rather than
+# anything of the run's.
+trap 'cleanup; rm -f "$dir/$exported"' EXIT
+rm -f "$dir/$exported"
+
+# Whether the file on screen is the one named: the title carries its name,
+# and "loading" in front of it while the next one is on its way.
+shown() {
+    case "$(window title)" in "$1 "*) return 0 ;; *) return 1 ;; esac
+}
+
+keep_pointer
+open 1000 600 "$dir"
+keys bracketright bracketright bracketright
+loaded
+settle
+shown "$relief" || { echo "$relief is not what came up" >&2; exit 1; }
+
+set -- $(magick identify -format '%w %h' "$dir/$relief")
+W=$1
+H=$2
+corner=$(fitted "$W" "$H" $((x - side / 2)) $((y - side / 2)))
+opposite=$(fitted "$W" "$H" $((x + side / 2)) $((y + side / 2)))
+
+record "export.mp4" cursor
+started=$(since_record)
+sleep 0.7
+
+# Gray, viridis, magma, turbo: one press is the yellow and green one.
+keys r
+sleep 1.2
+keys x
+sleep 0.4
+
+# The box is dragged out corner to corner, and the pointer is placed at
+# each end rather than glided there, since which pixel it is over is what
+# the region is made of.
+gesture place $corner -- rest 0.4 -- drag_to $opposite placed -- rest 1.2
+
+# The button that opens the menu of the file stands before the name in the
+# top bar, after the two chevrons and the count between them: 106 across,
+# on the bar's centerline. The menu hangs under it, a heading and five
+# items 26 apart, and Export is the last of them.
+#
+# The dialog is 360 wide and centered in the window, so the rest of this is
+# measured from the window's corner as well: the first of the three size
+# boxes under the formats, and Export at the foot beside Cancel.
+set -- $(window geometry)
+gesture glide $(($1 + 106)) $(($2 + 14)) -- rest 0.4 -- click -- rest 0.9 \
+    -- glide $(($1 + 150)) $(($2 + 188)) -- rest 0.5 -- click -- rest 1.2 \
+    -- glide $(($1 + 390)) $(($2 + 336)) -- rest 0.4 -- click -- rest 0.5
+
+# The box holds the hundred it opened at; Ctrl+A takes all of it, and what
+# is typed replaces it. The two beside it follow as the digits land.
+press ctrl+a
+sleep 0.4
+PACE=0.25
+keys 2 5
+unset PACE
+sleep 1.4
+
+gesture glide $(($1 + 644)) $(($2 + 418)) -- rest 0.5 -- click
+
+# The file is written on a thread of its own and shown once it has landed,
+# which is when the title takes its name.
+for _ in $(seq 300); do
+    shown "$exported" && break
+    sleep 0.1
+done
+sleep 1.2
+
+press 0
+sleep 2
+film=$(cut)
+close
+gif "$film" "export.gif" 800 "$started"
