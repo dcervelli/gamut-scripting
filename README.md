@@ -19,6 +19,7 @@ is what changes the picture there.
 | `compare` | the three rasters of one mountain flipped through, the wheel rolled into the crater on the way |
 | `false_color` | the hillshade held over the crater, `r` pressed through the four color maps |
 | `fuzzy_finder` | the chooser over a directory of several hundred pictures, opened from the counter at the head of the top bar and one picture chosen by a few letters, then opened again with Ctrl+P and one asked for by its number, typed slowly |
+| `file_list` | the seven pictures of one mountain as their directory, the list down the left: the menu at its head opened and Area chosen, then Descending, which takes the strip to its foot, the wheel rolling it back to its head, and the first row clicked for the elevation model, the wheel turned over the crater, then the third for the shaded relief of the same ground, which comes up where the model was left |
 | `themes` | the photograph with the information panel open, on Tokyo Night, then on Gruvbox once the desk is switched to it, the two stills flipped between every two seconds |
 | `histogram` | the photograph with the histogram opened from its button, the black and white handles on the band each dragged a fifth of the way in, and the button beside the band pressed to paint the clipped pixels, then pressed again to take the paint off |
 | `ui` | the directory of the mountain's four rasters, the pointer held on the counter at the head of the top bar for its tooltip, the help button at the foot of the right strip pressed and the table of keys scrolled to its end over three seconds, Esc, and the button at the end of the top bar pressed to hide the interface |
@@ -43,14 +44,16 @@ Three things are the environment's to say, each with a default:
 | `SCREENSHOTS` | where the pictures go | `screenshots/` here |
 | `FILMS` | where the recordings go before they are GIFs | `films/` here, ignored by git |
 
-The pictures they open are in `images/`: the four rasters of one mountain
-in `images/mora`, several hundred bird plates in `images/birds`, and the
-GIF and the stag beside them. Each script takes another path as its first
-argument. `mandelbrot` opens no picture of ours: the program that draws its
-picture is the Rust crate in [`mandelbrot-zoom/`](mandelbrot-zoom/), which
-the script builds if `cargo build --release` has not been run there
-already, or `MANDELBROT` names another binary. `performance` opens one too
-big to keep here, the 14000×9600 raster of a Swiss 1:50000 map sheet at
+The pictures they open are in `images/`: seven of one mountain in
+`images/mora` — a photograph, two raw frames, an aerial and the three
+12.5 m rasters of the same ground — several hundred bird plates in
+`images/birds`, and the GIF and the stag beside them. Each script takes
+another path as its first argument. `mandelbrot` opens no picture of ours:
+the program that draws its picture is the Rust crate in
+[`mandelbrot-zoom/`](mandelbrot-zoom/), which the script builds if `cargo
+build --release` has not been run there already, or `MANDELBROT` names
+another binary. `performance` opens one too big to keep here, the
+14000×9600 raster of a Swiss 1:50000 map sheet at
 `~/Downloads/swiss-map-raster50_2007_285_krel_2.5_2056.tif`, and wants
 that or another file as its argument.
 
@@ -229,7 +232,11 @@ The pointer is placed first with `cursor`, and `fitted W H X Y` says where
 image pixel X, Y of a W×H image is in the layout while the image is fitted
 to the window — the same sum gamut's `chrome::content_area` and
 `View::fit_zoom` do, redone in awk, so that a script can put the pointer on
-a feature of the picture by its own coordinates.
+a feature of the picture by its own coordinates. A fifth number is what
+the file list takes off the left of that area where it is up, which
+`file_list` reads from gamut's own state file: the width it fits a
+thumbnail into is the one thing about the list the program keeps between
+runs, and where the rows are and where the picture is both follow from it.
 
 ## A recording
 

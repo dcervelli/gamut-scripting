@@ -1,0 +1,125 @@
+#!/bin/sh
+# The README's file list: the pictures of one mountain opened as their
+# directory in a 1000x600 window, the list down the left in name order.
+# The pointer goes to the button at its head, which opens the menu of
+# sorts; Area is chosen, and every row then wears the pixels it was sorted
+# on; the menu again, and Descending, which stands the biggest first and
+# takes the strip to its foot, the picture on screen being the smallest of
+# them. The wheel rolls the strip back to its head, where the three
+# rasters now stand, and the first is clicked: the elevation model, which
+# the wheel is then turned over the crater of. The third row is clicked
+# last — the shaded relief of the same ground, of a size with the model,
+# so it arrives at the zoom and the place the model was left at. The
+# pointer is in the film, since where it goes is the point, and it moves
+# as a hand would, through device.py.
+#
+#   ./file_list              on images/mora
+#   ./file_list DIR X Y      on another directory, the wheel over pixel
+#                            X, Y of the largest picture in it
+#
+# Where the rows are is the one thing about the panel that is not fixed:
+# gamut keeps the width it fits a thumbnail into between runs, so the
+# script reads that from the state file rather than take the width the
+# program first opens at. Everything from there is arithmetic — the panel
+# is that width, the room either side of a slot and the scrollbar's
+# gutter; a row is a title, a slot as tall as its picture's shape makes
+# it, and the room over and under; and the picture is fitted into what is
+# left of the window, which is why `fitted` is told what the list takes.
+#
+# The list stands in the order the script works out for itself, since
+# which file each row holds is what the clicks below mean: the pictures by
+# the pixels they hold, the biggest first, and those of a size left in the
+# order they were already in, gamut's sort being stable. That order is the
+# directory in byte order, which is what the program reads it in — not the
+# desk's collation, which sorts the punctuation in these names the other
+# way and would put a different file at the head of the list.
+
+. "$(dirname "$0")/lib.sh"
+
+dir=${1:-$ROOT/images/mora}
+x=${2:-2340}
+y=${3:-2260}
+
+# The room either side of a slot, and the scrollbar's gutter beside it:
+# what the panel is wider than the thumbnails in it.
+state=${XDG_STATE_HOME:-$HOME/.local/state}/gamut/state
+slot=
+[ -f "$state" ] && slot=$(awk -F '[ =]+' '$1 == "filmstrip_width" { print int($2) }' "$state")
+slot=${slot:-148}
+panel=$((slot + 2 * 8 + 10))
+
+sizes=$(printf '%s\n' "$dir"/* | LC_ALL=C sort | while IFS= read -r path; do
+    magick identify -format '%w %h\n' "$path[0]"
+done | awk '{ print $1 * $2, $1, $2 }' | sort -s -k1,1nr | awk '{ print $2, $3 }')
+
+open 1000 600 "$dir"
+set -- $(window geometry)
+wx=$1
+wy=$2
+wh=$4
+
+# The middle of the first row and of the third, down from the window's
+# top, and the notches that take the strip back to its head: the top bar
+# and the list's head are a bar each, a title is 22 and the room over a
+# slot 4 and under it 8, and a slot is as tall as the picture's shape
+# makes it, held between half its width and one and a half. The toolkit
+# scrolls forty points to the notch, and the strip is never scrolled
+# further than its own height less the window's, whichever row the sort
+# put the picture on screen on; one notch more for the rounding, and any
+# left over do nothing, the strip being at its head already.
+set -- $(printf '%s\n' "$sizes" | awk -v slot="$slot" -v viewport=$((wh - 60)) '
+    function height(w, h,   shape) {
+        shape = h / w
+        if (shape < 0.5) shape = 0.5
+        if (shape > 1.5) shape = 1.5
+        return 22 + 4 + int(slot * shape + 0.5) + 8
+    }
+    { rows[NR] = height($1, $2); total += rows[NR] }
+    END {
+        notches = int((total - viewport) / 40) + 1
+        if (notches < 1) notches = 1
+        printf "%d %d %d\n", 60 + rows[1] / 2,
+            60 + rows[1] + rows[2] + rows[3] / 2, notches
+    }')
+first_row=$1
+third_row=$2
+notches=$3
+set -- $sizes
+
+record "file_list.mp4" cursor
+started=$(since_record)
+sleep 0.8
+
+# The button at the head of the list opens the menu of sorts: a bar's
+# padding in and half a button across, on the centerline of a head that
+# stands a bar's height under the top bar. The menu hangs under the
+# button, its items 26 apart — the eight things a list can be sorted by,
+# Name first and Area last, 290 down from the window's top, and under
+# them, set apart, the two ways the sort can run: Ascending 326 down and
+# Descending 352. An item's words start 14 across and its cell runs to 85,
+# so 45 is inside all of them. The pointer rests on the button first, long
+# enough for the tooltip that says what it opens.
+gesture glide $((wx + 15)) $((wy + 45)) -- rest 1.0 -- click -- rest 0.7 \
+    -- glide $((wx + 45)) $((wy + 290)) -- rest 0.5 -- click -- rest 1.5 \
+    -- glide $((wx + 15)) $((wy + 45)) -- rest 0.5 -- click -- rest 0.7 \
+    -- glide $((wx + 45)) $((wy + 352)) -- rest 0.5 -- click -- rest 1.5
+
+# The wheel is turned where the menu left the pointer, which is over the
+# strip; then the first row, clicked across the middle of the panel, where
+# the thumbnail is whatever the slot is.
+gesture wheel "$notches" 1.0 -- rest 0.8 \
+    -- glide $((wx + panel / 2)) $((wy + first_row)) -- rest 0.5 -- click
+loaded
+sleep 1.2
+
+# Seven notches from a fit of 23% is 110%. The film ends back on the
+# crater, off the row that was clicked: a row under the pointer says the
+# whole of its name beside the panel, over the picture.
+crater=$(fitted "$1" "$2" "$x" "$y" "$panel")
+gesture glide $crater -- rest 0.6 -- wheel 7 0.8 -- rest 1.5 \
+    -- glide $((wx + panel / 2)) $((wy + third_row)) -- rest 0.5 -- click -- rest 1.5 \
+    -- glide $crater -- rest 1.2
+
+film=$(cut)
+close
+gif "$film" "file_list.gif" 800 "$started"

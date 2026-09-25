@@ -287,17 +287,21 @@ keyboard() {
 
 # Where in the layout image pixel X, Y of a W by H image is while the image
 # is fitted to the window: the picture is centered in the area the four
-# bars leave, at whichever of the two scales fits all of it in.
+# bars leave, at whichever of the two scales fits all of it in. LIST is
+# what the file list takes off the left of that area, where it is up;
+# without it the four bars are all that stands around the picture, which
+# is what every script that puts the list away wants.
 #
 #   cursor $(fitted 6016 3384 960 2150)
+#   cursor $(fitted 4400 3760 2340 2260 163)   with the list down the left
 fitted() {
-    set -- "$1" "$2" "$3" "$4" $(window geometry) $(scale)
-    awk -v W="$1" -v H="$2" -v X="$3" -v Y="$4" \
-        -v wx="$5" -v wy="$6" -v ww="$7" -v wh="$8" -v scale="$9" -v bar=30 'BEGIN {
-        vw = (ww - 2 * bar) * scale; vh = (wh - 2 * bar) * scale
+    set -- "$1" "$2" "$3" "$4" "${5:-0}" $(window geometry) $(scale)
+    awk -v W="$1" -v H="$2" -v X="$3" -v Y="$4" -v list="$5" \
+        -v wx="$6" -v wy="$7" -v ww="$8" -v wh="$9" -v scale="${10}" -v bar=30 'BEGIN {
+        vw = (ww - 2 * bar - list) * scale; vh = (wh - 2 * bar) * scale
         zoom = vw / W; if (vh / H < zoom) zoom = vh / H
         x = (vw - W * zoom) / 2 + X * zoom; y = (vh - H * zoom) / 2 + Y * zoom
-        printf "%d %d\n", wx + bar + x / scale, wy + bar + y / scale
+        printf "%d %d\n", wx + bar + list + x / scale, wy + bar + y / scale
     }'
 }
 
