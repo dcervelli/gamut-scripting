@@ -13,9 +13,16 @@
 # the middle of the window. The pointer is in the film, since where it goes
 # is the point, and it moves as a hand would, through device.py.
 #
-# The relief is the fourth of the directory's four files, so the film opens
-# on it: the three steps to it are before the recording starts, the first
-# of them reading a 38 MB elevation model. The picture is single-channel,
+# The relief is the last of four files — the photograph and the three
+# rasters — opened by name rather than as their directory, which holds
+# other pictures of the mountain that would come between them and change
+# which file the steps land on. The film opens on the relief: the three
+# steps to it are before the recording starts, the first of them reading a
+# 38 MB elevation model. A list of four keeps the steps and the count at
+# the head of the top bar, which a single file goes without, so the file
+# menu's button stands where the clicks below expect it; Tab puts the file
+# list away, so that the picture has the window and `fitted` finds it
+# where the four bars alone leave it. The picture is single-channel,
 # which is what false color wants; the ramp is written into the exported
 # file's pixels, so what comes back is RGB.
 #
@@ -23,24 +30,37 @@
 # of pictures this repository keeps. It is taken away before the take and
 # after it: nothing is ever written over, so a file left by an earlier take
 # would push the name to `-edited-2` and the film would show that, and left
-# behind it would be a fifth file in the directory the other pictures show
-# as four.
+# behind it would be one more file in the directory the other pictures show.
 #
-#   ./export             on images/mora
-#   ./export DIR X Y     on another directory, the box around pixel X, Y of
-#                        its fourth file
+#   ./export                   on images/mora
+#   ./export X Y FILE...       on other files, the box around pixel X, Y of
+#                              the last of them
 
 . "$(dirname "$0")/lib.sh"
 
-dir=${1:-$ROOT/images/mora}
 # The summit: the highest pixel of the elevation model beside the relief,
 # and the middle of the box.
-x=${2:-2359}
-y=${3:-2355}
+x=${1:-2359}
+y=${2:-2355}
 side=1000
+if [ $# -gt 2 ]; then
+    shift 2
+else
+    set -- "$ROOT/images/mora/mora.jpg" \
+        "$ROOT/images/mora/mora_dem_12.5m_utm10.tif" \
+        "$ROOT/images/mora/mora_hillshade_12.5m.tif" \
+        "$ROOT/images/mora/mora_relief_12.5m_smr50.png"
+fi
 
-# The program lists a directory in name order, and so does this.
-relief=$(LC_ALL=C ls "$dir" | sed -n 4p)
+# The last file is the relief, and the steps to it are one fewer than the
+# files.
+steps=
+for path; do
+    [ -z "${relief:-}" ] || steps="$steps bracketright"
+    relief=$path
+done
+dir=$(dirname "$relief")
+relief=$(basename "$relief")
 exported="${relief%.*}-edited.png"
 
 # However the script ends, the file it wrote goes: lib.sh's own cleanup
@@ -56,8 +76,8 @@ shown() {
 }
 
 keep_pointer
-open 1000 600 "$dir"
-keys bracketright bracketright bracketright
+open 1000 600 "$@"
+keys Tab $steps
 loaded
 settle
 shown "$relief" || { echo "$relief is not what came up" >&2; exit 1; }
@@ -84,16 +104,21 @@ sleep 0.4
 gesture place $corner -- rest 0.4 -- drag_to $opposite placed -- rest 1.2
 
 # The button that opens the menu of the file stands before the name in the
-# top bar, after the two chevrons and the count between them: 106 across,
-# on the bar's centerline. The menu hangs under it, a heading and five
-# items 26 apart, and Export is the last of them.
+# top bar, after the file list's toggle and then the two chevrons and the
+# count between them: 136 across with the count at "4 / 4", on the bar's
+# centerline — a bar's padding, the toggle, a gap, the chevrons with the
+# count and its seams, and a gap make 100 and the count's words, and the
+# button is 22 wide. The menu hangs under it, a heading and seven
+# items 26 apart — the three copies, rename, taking the file off the list,
+# which is offered only while there is more than one, delete, and export —
+# and Export is the last of them, 240 down.
 #
 # The dialog is 360 wide and centered in the window, so the rest of this is
 # measured from the window's corner as well: the first of the three size
 # boxes under the formats, and Export at the foot beside Cancel.
 set -- $(window geometry)
-gesture glide $(($1 + 106)) $(($2 + 14)) -- rest 0.4 -- click -- rest 0.9 \
-    -- glide $(($1 + 150)) $(($2 + 188)) -- rest 0.5 -- click -- rest 1.2 \
+gesture glide $(($1 + 136)) $(($2 + 14)) -- rest 0.4 -- click -- rest 0.9 \
+    -- glide $(($1 + 180)) $(($2 + 240)) -- rest 0.5 -- click -- rest 1.2 \
     -- glide $(($1 + 390)) $(($2 + 336)) -- rest 0.4 -- click -- rest 0.5
 
 # The box holds the hundred it opened at; Ctrl+A takes all of it, and what

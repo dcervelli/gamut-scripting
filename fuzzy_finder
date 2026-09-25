@@ -11,15 +11,20 @@
 . "$(dirname "$0")/lib.sh"
 
 open 1000 600 "${1:-$ROOT/images/birds}"
+# The file list comes up down the left with a directory open; Tab puts it
+# away, so that the film is of the chooser rather than of the list.
+keys Tab
 
 record "fuzzy_finder.mp4" cursor
 started=$(since_record)
 sleep 0.5
 
 set -- $(window geometry)
-# The counter sits between the two chevrons at the head of the top bar, on
-# the bar's centerline; 45 across is inside it whatever the count.
-glide $(($1 + 45)) $(($2 + 15))
+# The counter sits between the two chevrons at the head of the top bar,
+# after the file list's toggle, on the bar's centerline: a bar's padding,
+# the toggle, a gap and the left chevron put its edge 57 across, and 70 is
+# inside it whatever the count.
+glide $(($1 + 70)) $(($2 + 15))
 sleep 0.3
 click
 sleep 1

@@ -1,23 +1,34 @@
 #!/bin/sh
 # The README's comparison: the three rasters of one mountain flipped
-# through in a 1000x600 window — the elevation model, the hillshade, the
-# shaded relief — the wheel rolled over the crater to about 100% on the
-# third, and the flip back; the files are of a size, so the zoom follows.
+# through in a 1000x600 window, with the file list put away — the
+# elevation model, the hillshade, the shaded relief — the wheel rolled over
+# the crater to about 100% on the third, and the flip back; the files are
+# of a size, so the zoom follows.
 #
-#   ./compare            on images/mora
-#   ./compare DIR X Y    on another directory, zooming into pixel X, Y of its second file
+# The three are opened by name rather than as their directory, which holds
+# other pictures of the mountain that would come between them in name order.
+#
+#   ./compare                        the three of images/mora
+#   ./compare X Y FILE FILE FILE     three others of one size, zooming into their pixel X, Y
 
 . "$(dirname "$0")/lib.sh"
 
-dir=${1:-$ROOT/images/mora}
-x=${2:-2340}
-y=${3:-2260}
+x=${1:-2340}
+y=${2:-2260}
+if [ $# -gt 2 ]; then
+    shift 2
+else
+    set -- "$ROOT/images/mora/mora_dem_12.5m_utm10.tif" \
+        "$ROOT/images/mora/mora_hillshade_12.5m.tif" \
+        "$ROOT/images/mora/mora_relief_12.5m_smr50.png"
+fi
 
-open 1000 600 "$dir"
-keys bracketright
-loaded
-set -- $(window title)
-set -- $(magick identify -format '%w %h' "$dir/$1")
+open 1000 600 "$@"
+# The file list comes up down the left with several files open; Tab puts it
+# away, so that the picture has the window and `fitted` finds it where the
+# four bars alone leave it.
+keys Tab
+set -- $(magick identify -format '%w %h' "$1")
 
 record "compare.mp4" cursor
 started=$(since_record)

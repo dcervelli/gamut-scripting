@@ -3,7 +3,9 @@
 # open button — second in the left strip, under the copy button — pressed,
 # and the menu of what else on this desk will open the file left standing
 # beside it. What the menu lists is whatever the desktop has installed for
-# a JPEG, so the picture is of this desk's.
+# a JPEG, so the picture is of this desk's. Space first fills the window
+# with the picture, so that the menu stands over it rather than over the
+# empty bands either side of a 3:2 picture seen whole.
 #
 #   ./open_in            on images/mora/mora.jpg
 #   ./open_in FILE       on another file
@@ -11,6 +13,7 @@
 . "$(dirname "$0")/lib.sh"
 
 open 1000 600 "${1:-$ROOT/images/mora/mora.jpg}"
+keys space
 
 set -- $(window geometry)
 # The strip's buttons are 22 square, 4 under the top bar and 8 apart, so

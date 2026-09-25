@@ -4,20 +4,22 @@
 # four color maps — gray, viridis, magma, turbo — a second on each. The
 # zoom is done before the film starts; the film is the colors.
 #
-#   ./false_color            on images/mora
-#   ./false_color DIR X Y    on another directory, zooming into pixel X, Y of its third file
+# The hillshade is opened alone rather than as one of its directory, which
+# holds other pictures of the mountain that would change which file the
+# steps land on; alone, it also comes up without the file list, which is
+# shown only while there is more than one file.
+#
+#   ./false_color              on images/mora's hillshade
+#   ./false_color FILE X Y     on another file, zooming into its pixel X, Y
 
 . "$(dirname "$0")/lib.sh"
 
-dir=${1:-$ROOT/images/mora}
+file=${1:-$ROOT/images/mora/mora_hillshade_12.5m.tif}
 x=${2:-2340}
 y=${3:-2260}
 
-open 1000 600 "$dir"
-keys bracketright bracketright
-loaded
-set -- $(window title)
-set -- $(magick identify -format '%w %h' "$dir/$1")
+open 1000 600 "$file"
+set -- $(magick identify -format '%w %h' "$file")
 cursor $(fitted "$1" "$2" "$x" "$y")
 sleep 0.3
 # Seven notches from a fit of 23% is 109%.

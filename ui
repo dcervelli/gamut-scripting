@@ -1,5 +1,5 @@
 #!/bin/sh
-# The README's interface tour: a directory of four rasters in a 1000x600
+# The README's interface tour: four pictures of one mountain in a 1000x600
 # window, the pointer brought to the counter at the head of the top bar and
 # held there for its tooltip, then down to the help button at the foot of
 # the right strip and pressed, the table of keys it opens scrolled to its
@@ -8,21 +8,37 @@
 # pressed. The pointer is in the film, since where it goes is the point,
 # and it moves as a hand would, through device.py.
 #
-#   ./ui            on images/mora
-#   ./ui DIR        on another directory
+# The four are opened by name rather than as their directory, which holds
+# other pictures of the mountain that would join them in the count.
+#
+#   ./ui                on images/mora
+#   ./ui FILE...        on other files
 
 . "$(dirname "$0")/lib.sh"
 
-open 1000 600 "${1:-$ROOT/images/mora}"
+if [ $# -eq 0 ]; then
+    set -- "$ROOT/images/mora/mora.jpg" \
+        "$ROOT/images/mora/mora_dem_12.5m_utm10.tif" \
+        "$ROOT/images/mora/mora_hillshade_12.5m.tif" \
+        "$ROOT/images/mora/mora_relief_12.5m_smr50.png"
+fi
+
+open 1000 600 "$@"
+# The file list comes up down the left with several files open; Tab puts
+# it away, so that the tour is of the bars and the strips around the
+# picture.
+keys Tab
 record "ui.mp4" cursor
 started=$(since_record)
 sleep 0.5
 
 set -- $(window geometry)
 # The counter sits between the two chevrons at the head of the top bar,
-# on the bar's centerline. The tooltip comes up half a second after the
-# pointer stops, and is left up for two.
-glide $(($1 + 45)) $(($2 + 15))
+# after the file list's toggle, on the bar's centerline: a bar's padding,
+# the toggle, a gap and the left chevron put its edge 57 across, and 70 is
+# inside it whatever the count. The tooltip comes up half a second after
+# the pointer stops, and is left up for two.
+glide $(($1 + 70)) $(($2 + 15))
 sleep 2.2
 
 # The help button is the last of the right strip, a bar's padding up from

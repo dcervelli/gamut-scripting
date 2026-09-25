@@ -30,18 +30,18 @@ wheel 14
 sleep 0.5
 
 set -- $(window geometry)
-# The dot is the second button of the bottom bar, after the grid toggle
-# and its reading: 86 logical pixels in from the left edge with the reading
-# at "10 px", on the bar's centerline.
-dot_x=$(($1 + 86))
+# The dot is the third button of the bottom bar, after the grid toggle
+# with its reading and the loupe's toggle: 116 logical pixels in from the
+# left edge with the reading at "10 px", on the bar's centerline.
+dot_x=$(($1 + 116))
 dot_y=$(($2 + $4 - 15))
 glide "$dot_x" "$dot_y"
 sleep 3
 click
 sleep 1
 # The menu stands over the dot, and Hex is the first of its three cells:
-# its middle is 41 right of the dot's and 46 up.
-glide $((dot_x + 41)) $((dot_y - 46))
+# its middle is 41 right of the dot's and 40 up.
+glide $((dot_x + 41)) $((dot_y - 40))
 sleep 0.8
 click
 sleep 0.8

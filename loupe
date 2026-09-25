@@ -22,6 +22,10 @@ fx=${4:-425}
 fy=${5:-880}
 
 open 1000 600 "$dir"
+# The file list comes up down the left with a directory open; Tab puts it
+# away, so that the picture has the window and `fitted` finds it where the
+# four bars alone leave it.
+keys Tab
 set -- $(window title)
 set -- $(magick identify -format '%w %h' "$dir/$1")
 keep_pointer
