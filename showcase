@@ -24,29 +24,35 @@
 # walk through the three rasters closes up behind it — the film tidies its own
 # list rather than being handed a list arranged to look tidy.
 #
-# The master is the monitor at 3840x2160 and the delivery is 1920x1080, which
-# is what pays for the punch-in: a crop wider than 1920 is still a downscale
-# to delivery and therefore still sharp, so 1.5x costs nothing. Beside the
-# master goes an edit list — what was pressed and when, in seconds from the
-# first frame, and where the crop went — and `deliver` cuts the film by it,
-# so the edit is reproducible the way the screenshots are. The captions are
-# burned in rather than overlaid live, since the film plays muted and neither
-# key-overlay program on this desk is installed or would stay off the
-# compositor's own bindings.
+# The master is the monitor at 3840x2160 and the delivery is 1920x1080, so
+# every frame goes down 2:1 and comes out sharper than a capture taken at
+# 1080p would be. It also leaves room for a crop: anything wider than 1920 is
+# still a downscale, so the cutting can tighten on something for nothing —
+# which this film does not do any more, the window being large enough that
+# nothing in it wants a closer look. Beside the master goes an edit list —
+# what was pressed and when, in seconds from the first frame, and where the
+# crop went — and `deliver` cuts the film by it, so the edit is reproducible
+# the way the screenshots are. The captions are burned in rather than overlaid live,
+# since the film plays muted and neither key-overlay program on this desk is
+# installed or would stay off the compositor's own bindings.
 #
 # A run with no argument films the whole thing and cuts it. A run that names
 # beats films those and stops after the last of them, and leaves the master
-# uncut — the captions and the punch are arithmetic over the whole film, and a
-# beat being worked on is for watching. The beats before the first one asked
+# uncut — the captions are arithmetic over the whole film, and a beat being
+# worked on is for watching. The beats before the first one asked
 # for are still run, since the window has to be in the state that beat starts
 # from, but with their pauses cut short. `FILM=no` skips the recorder
 # altogether, which is the quickest way round the loop: the beat happens on
-# screen and nothing is encoded.
+# screen and nothing is encoded. A run that says `post` cuts the film that is
+# already there by the list beside it and touches nothing else, which is the
+# way round the loop when what is being worked on is the cut rather than the
+# take.
 #
 #   ./showcase                    the whole film, cut, on HDMI-A-1, workspace 4
 #   ./showcase bird               that beat alone, recorded, left uncut
 #   FILM=no ./showcase bird       that beat alone, just watched
 #   ./showcase crater chain       from one to the other
+#   ./showcase post               the film already made, cut again
 #   MONITOR=DP-2 ./showcase       films the other monitor
 #   WORKSPACE=9 ./showcase        on another empty workspace
 #   AWAY='Rose Pine' ./showcase   swapping to another theme and back
@@ -54,15 +60,17 @@
 # The beats, in order:
 #
 #   interface  the window on the desk, the list and the bars taken away
-#   summit     the wheel into the summit, the pan across, and Space back out
+#   summit     the wheel into the summit, one arc across to the tree, and
+#              Space back out
 #   bird       the loupe on the eye, and round it as it magnifies
 #   chooser    Ctrl+P to the sunrise raw
 #   clipping   the histogram and the marks, off their own buttons
 #   delete     the marks off and the frame thrown away from its menu
 #   crater     the histogram away and the wheel into the crater
 #   chain      back up through hillshade and elevation, off the list
-#   panel      false color, the information panel, and the punch in
-#   theme      Omarchy's theme menu, and back to the theme it opened on
+#   panel      false color, and the information panel down the right
+#   theme      Omarchy's theme menu, the relief map opened under the new
+#              palette, and back to the theme the film opened on
 
 . "$(dirname "$0")/lib.sh"
 
@@ -80,6 +88,14 @@ AWAY=${AWAY:-Lupine}
 # `device.py` is a process of its own.
 export POINTER_PACE=${POINTER_PACE:-24}
 
+# How long the hand takes over the pan across the opening picture. The one
+# shot in the film whose subject is the drawing rather than what is drawn, so
+# it is paced to be watched rather than to be got through: at PACE the arc
+# would be over in a third of a second, which says nothing about how well the
+# picture keeps up with the hand. Long enough that a frame dropped anywhere
+# along it would be seen, and no longer.
+PAN=1.2
+
 # Whether to record at all. A beat being worked on is quicker watched as it
 # happens than encoded first and opened afterwards.
 FILM=${FILM:-yes}
@@ -87,27 +103,23 @@ FILM=${FILM:-yes}
 CODEC=${CODEC:-hevc}
 QUALITY=${QUALITY:-ultra}
 
-# The window, in logical pixels. 1400 across leaves 260 of background either
-# side and lands within about a tenth of the pixel density the window films in
-# `films/` already ship, which is why the film opens wide and has nothing to
-# punch in for. 768 down is what lets the one punch-in hold the information
-# panel: the panel is as tall as the content area less its padding, always, so
-# at 800 it would be 1432 of the master's pixels tall and a 1440-tall crop
-# would hold it with four pixels to spare either side.
-WIDTH=1400
-HEIGHT=768
-# What the punch tightens by. 2.0 would be a 1920x1080 crop, which is the
-# delivery grid exactly and therefore the most that is not an upscale — but it
-# is also shorter than the panel, so it would cut a quarter of it off.
-PUNCH=1.5
-# How long the push in takes, and the pull out at the other end of it. A cut
-# straight to the crop is a jump the eye reads as a mistake; half a second of
-# movement reads as a camera.
+# How long a crop takes to come in, and to go out at the other end of it,
+# wherever the cut tightens on something: a cut straight to it is a jump the
+# eye reads as a mistake, where half a second of movement reads as a camera.
+# Nothing in this film tightens any more — see `beat_panel` — but the cutting
+# still knows how, and one `note crop` would ask for it again.
 RAMP=0.5
+
+# The window's width, in logical pixels. 1400 across leaves 260 of background
+# either side and lands within about a tenth of the pixel density the window
+# films in `films/` already ship, which is why the film opens wide and has
+# nothing to punch in for at the start. Its height is the opening picture's to
+# say — see HEIGHT, under the file list it is worked out from.
+WIDTH=1400
 
 # Where the pointer goes in each picture, in that picture's own pixels.
 SUMMIT_X=1500; SUMMIT_Y=340        # mora.jpg, 3008x2000
-SUMMIT_NOTCHES=6                   # a fit of 71%, and 1.25^6, is about 270%
+SUMMIT_NOTCHES=3                   # a fit of 78%, and 1.25^3, is about 150%
 BREAST_X=950; BREAST_Y=950         # mora_bird.dng, 3032x2024
 EYE_X=1011; EYE_Y=455
 EYE_CIRCLE=10                      # how wide the hand wanders while the loupe changes
@@ -124,6 +136,12 @@ CRATER_X=2340; CRATER_Y=2260       # the three rasters, 4400x3760
 # its timings are worked out.
 BEATS="interface summit bird chooser clipping delete crater chain panel theme"
 
+POST=no
+if [ "${1:-}" = post ]; then
+    [ $# -eq 1 ] || { echo "showcase: post takes no other argument" >&2; exit 1; }
+    POST=yes
+fi
+
 if [ $# -eq 0 ]; then
     filmed=$BEATS
     whole=yes
@@ -139,7 +157,7 @@ last=
 for beat in $BEATS; do
     case " $filmed " in *" $beat "*) last=$beat ;; esac
 done
-for beat in $filmed; do
+[ "$POST" = yes ] || for beat in $filmed; do
     case " $BEATS " in
         *" $beat "*) ;;
         *) echo "showcase: no beat called $beat; they are: $BEATS" >&2; exit 1 ;;
@@ -160,6 +178,30 @@ slot=
 [ -f "$state" ] && slot=$(awk -F '[ =]+' '$1 == "filmstrip_width" { print int($2) }' "$state")
 slot=${slot:-148}
 LIST=$((slot + 2 * 8 + 10))
+
+# The height that gives the opening picture the whole of the viewport.
+#
+# What the app does with a window is give the picture as much of it as the
+# picture's shape allows, so a window of the picture's own shape is one with
+# nothing in it going spare: mora.jpg is 3 by 2, and at any other shape the
+# film's first frame carries a band of empty viewport down two of its sides —
+# which is the one thing a film arguing that this app uses the room it is
+# given should not open on.
+#
+# The viewport is the window less the two bars, the two side strips and the
+# file list, which is up throughout, so the height that makes it 3 by 2 is
+# that width in the picture's own ratio, and the two bars again: 843, for a
+# picture at 78% filling 2354 by 1566 of the master's pixels but for a row.
+# Rounded up rather than down, so that what is over is a hair of viewport
+# under the picture rather than the picture a hair short of the width.
+#
+# It is not the height the desk has room for, which is 1054, and is not meant
+# to be: 843 leaves better than a hundred logical pixels of background over
+# the window and as many under it, and the film is as much about the window
+# standing on this desk as about what is in it.
+HEIGHT=$(awk -v width="$WIDTH" -v list="$LIST" 'BEGIN {
+    printf "%d\n", int((width - 2 * 30 - list) * 2000 / 3008 + 0.999) + 2 * 30
+}')
 
 # How far to drag the picture down, in logical pixels, to bring its top edge
 # to the top of the viewport: after NOTCHES turns of the wheel about image
@@ -182,10 +224,11 @@ panned() {
 }
 
 # The same sum across instead of down: how far to drag the picture right, in
-# logical pixels, to bring its left edge to the left of the viewport. More
-# than a stroke of the hand can cover on a 1920-pixel desk, so the beat takes
-# it in two; the margin is doubled for that, a stroke losing its first pixels
-# to the toolkit's drag threshold and there being two of them now.
+# logical pixels, to bring its left edge to the left of the viewport. The
+# same margin over as well, for the pixels a stroke loses at its start to the
+# toolkit's drag threshold; the pan stops at the picture's edge by itself, so
+# a little over costs nothing and a little under would leave a seam of
+# background showing.
 swept() {
     set -- "$1" "$2" "$3" "$4" $(window geometry) $(scale)
     awk -v W="$1" -v H="$2" -v X="$3" -v notches="$4" -v list="$LIST" \
@@ -193,7 +236,7 @@ swept() {
         vw = (ww - 2 * bar - list) * scale; vh = (wh - 2 * bar) * scale
         fit = vw / W; if (vh / H < fit) fit = vh / H
         right = (vw - W * fit) / 2 + X * fit
-        printf "%d\n", (X * fit * step ^ notches - right) / scale + 60
+        printf "%d\n", (X * fit * step ^ notches - right) / scale + 30
     }'
 }
 
@@ -206,9 +249,9 @@ swept() {
 # and as the list has them once the file thrown away is gone: the two
 # cameras' three by two, and the three rasters' 4400 by 3760. Until the
 # thumbnail thread has read a header the slot is square, which it has long
-# since done by the time the film asks; and the five rows come to 763 of
-# the 768 the strip has, so the list is never scrolled and a row is where
-# this says it is.
+# since done by the time the film asks; and the five rows come to 763 of the
+# 843 the strip has, so the list is never scrolled and a row is where this
+# says it is.
 row() {
     awk -v n="$1" -v slot="$slot" 'BEGIN {
         split("0.6649 0.6675 0.8545 0.8545 0.8545", shape, " ")
@@ -240,6 +283,32 @@ circling() {
     }'
 }
 
+# The pointer's path for the pan across the picture: a half turn from where
+# the hand is, SWEEP to the right of it by the end and DROP below it at the
+# furthest, in MARKS marks, as words for `gesture`'s `drag_along`.
+#
+# Half an ellipse rather than half a circle, because the two axes have
+# different amounts of picture behind them and the arc is worth no more than
+# the pan it makes: across, the hand has as far as the window's edge, and
+# down, it wants exactly the picture's top edge and no further, which is a
+# shallower bulge than a true half circle would draw. It reads as a circle
+# all the same — an arc is read by its curve, not by its eccentricity.
+#
+# The marks are the shape of the path and nothing else: `drag_along` parts
+# the distance along them into its own steps and eases the whole of it once,
+# so more marks buy a rounder curve and cost no smoothness. Forty-eight puts
+# them under a quarter of a degree of the ellipse apart, which is a sixth of
+# a pixel off it at the worst — nothing the frame can show.
+arcing() {
+    awk -v x="$1" -v y="$2" -v sweep="$3" -v drop="$4" -v steps="$5" 'BEGIN {
+        for (i = 1; i <= steps; i++) {
+            a = 3.14159265 * i / steps
+            printf " %.1f %.1f", x + sweep * (1 - cos(a)) / 2, y + drop * sin(a)
+        }
+        printf "\n"
+    }'
+}
+
 # One field of the monitor being filmed, as `window` is one field of the
 # window: a number by name, or `frame` for its rectangle in logical pixels,
 # which is what `record` captures, or `master` for the size that rectangle
@@ -264,7 +333,11 @@ output() {
 scaled() {
     hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"$MODE\",
         position = \"auto\", scale = $1 })" >/dev/null
-    for _ in $(seq 30); do
+    # Ten seconds of asking, because a mode set with the positions left on
+    # auto takes as long as it takes: the monitors reflow, every layer surface
+    # is reconfigured and every window is laid out again, and three seconds of
+    # waiting was short enough to call a take lost that had in fact landed.
+    for _ in $(seq 100); do
         [ "$(output scale)" = "$1" ] && return 0
         sleep 0.1
     done
@@ -451,28 +524,32 @@ MODE=$(hyprctl monitors -j | jq -r --arg n "$MONITOR" \
     '.[] | select(.name == $n) | "\(.width)x\(.height)@\(.refreshRate * 100 | round / 100)"')
 [ -n "$MODE" ] || { echo "there is no monitor called $MONITOR" >&2; exit 1; }
 
-WAS_THEME=$(omarchy-theme-current)
-WAS_WORKSPACE=$(output activeWorkspace.name)
-WAS_SCALE=$(output scale)
+# The desk as the film wants it, and the window standing on it. Everything
+# here is put back by `restore` however the run ends — and a run that only
+# cuts a film already made asks for none of it.
+staged() {
+    WAS_THEME=$(omarchy-theme-current)
+    WAS_WORKSPACE=$(output activeWorkspace.name)
+    WAS_SCALE=$(output scale)
 
-showing "$WORKSPACE"
-pinned 2
-scaled 2 || { echo "$MONITOR would not go to scale 2" >&2; exit 1; }
-curate
+    showing "$WORKSPACE"
+    pinned 2
+    scaled 2 || { echo "$MONITOR would not go to scale 2" >&2; exit 1; }
+    curate
 
-# The pointer goes onto the filmed monitor before anything is opened: `open`
-# puts the window on the focused monitor, and focus follows the pointer, so
-# with the pointer still over the driving terminal the window would come up on
-# the other monitor, off camera.
-set -- $(output frame)
-MX=$1; MY=$2
-warp $((MX + $3 / 2)) $((MY + $4 / 2))
-sleep 0.5
+    # The pointer goes onto the filmed monitor before anything is opened:
+    # `open` puts the window on the focused monitor, and focus follows the
+    # pointer, so with the pointer still over the driving terminal the window
+    # would come up on the other monitor, off camera.
+    set -- $(output frame)
+    warp $(($1 + $3 / 2)) $(($2 + $4 / 2))
+    sleep 0.5
 
-open "$WIDTH" "$HEIGHT" "$CURATED"
-# The film has the pointer in it throughout, and the desk hides the pointer
-# whenever a key is pressed; put back however this ends.
-keep_pointer
+    open "$WIDTH" "$HEIGHT" "$CURATED"
+    # The film has the pointer in it throughout, and the desk hides the
+    # pointer whenever a key is pressed; put back however this ends.
+    keep_pointer
+}
 
 # The window on the desk, and what the interface is: the file list put away
 # from the toggle at the head of the top bar, then the bars themselves from
@@ -486,69 +563,76 @@ keep_pointer
 # the pointer is on screen doing them, which is more than a caption would
 # say.
 beat_interface() {
-    pause 1
+    pause 0.25
     set -- $(window geometry)
     # One hand rather than four: a glide and a click each make a device of their
     # own, and half a second of nothing goes by while each is made and taken
     # away. The rests are what the film wants between them anyway.
-    gesture glide $(($1 + 15)) $(($2 + 15)) -- rest 0.9 -- click -- rest 1.3 \
+    #
+    # The rest before each press is the tooltip's: it is named after half a
+    # second of the pointer being still, so 0.9 is the shortest rest that
+    # leaves it on screen to be read. Everything else here is held as briefly
+    # as it can be and still be seen — this is the beat before the pictures,
+    # and a viewer who has not been shown a photograph yet is the one most
+    # easily lost.
+    gesture glide $(($1 + 15)) $(($2 + 15)) -- rest 0.9 -- click -- rest 0.35 \
         -- glide $(($1 + $3 - 15)) $(($2 + 15)) -- rest 0.9 -- click
-    pause 2.2
+    pause 0.6
     note key Esc
     keys Escape
-    pause 1.1
+    pause 0.3
     note key Tab
     keys Tab
-    pause 1.1
+    pause 0.3
 }
 
-# Into the summit, across to the tree, and back out. Six notches from a fit
-# of 71% is about 270%. Space is CycleFit, and after a wheel zoom the fit is
-# none, so one press goes to the whole picture.
+# Into the summit, round it and across to the tree at the picture's far edge,
+# and back out. Three notches from a fit of 78% is about 150%. Space is
+# CycleFit, and after a wheel zoom the fit is none, so one press goes to the
+# whole picture.
+#
+# Three notches and not six, because the pan is one stroke now and a stroke
+# may go as far as the window's own edge and no further. The hand starts on
+# the summit, which the wheel leaves in the middle of the viewport, so it has
+# about 580 logical pixels of room to its right — and a drag pans by the
+# negative of itself, so that is what there is to bring the left of the
+# picture across with. At 150% those 580 carry the view the 1500 pixels from
+# the summit to the picture's left edge, where the tree stands; at 300% they
+# would carry it a third of that, and the rest would have to be a second
+# stroke with the hand reaching back between them, which is the thing this
+# beat used to be and is not any more.
 beat_summit() {
     set -- $(fitted 3008 2000 "$SUMMIT_X" "$SUMMIT_Y" "$LIST")
     px=$1; py=$2
     glide "$px" "$py"
-    pause 0.4
+    pause 0.1
 
-    # Where the two strokes of the pan across the picture start and end. A
-    # stroke may go as far as the window's own edge and no further, the
-    # pointer having to stay on the picture for the drag to be one; so the
-    # first stroke runs from where the pointer is to that edge, and the hand
-    # reaches back far enough for the second to finish there too. If the
-    # reach would be further than the viewport's left, it stops there and the
-    # pan ends a little short of the picture's edge rather than the pointer
-    # ending up on the file list.
-    down=$(panned 3008 2000 "$SUMMIT_Y" "$SUMMIT_NOTCHES")
+    # How far the stroke goes, and how far it bulges on the way out. Across:
+    # what brings the picture's left edge to the viewport's left, held to the
+    # room the hand has, the pan stopping at the picture's edge by itself
+    # where there is a little over. Down: what brings the picture's top edge
+    # to the viewport's top, which the arc reaches at its furthest and gives
+    # back by the end, so the sky over the summit comes in as the hand goes
+    # round and the tree is framed as the summit was.
+    drop=$(panned 3008 2000 "$SUMMIT_Y" "$SUMMIT_NOTCHES")
     sweep=$(swept 3008 2000 "$SUMMIT_X" "$SUMMIT_NOTCHES")
     set -- $(window geometry)
     edge=$(($1 + $3 - 40))
-    reach=$((edge - (sweep - (edge - px))))
-    [ "$reach" -lt $(($1 + 30 + LIST + 40)) ] && reach=$(($1 + 30 + LIST + 40))
+    [ $((px + sweep)) -gt "$edge" ] && sweep=$((edge - px))
 
     note key wheel
-    # Three turns of the wheel and the three strokes that follow them on one
-    # device. A `wheel` and a `drag` of their own would be a device each, and
-    # half a second of the picture sitting still while each is made and taken
-    # away; queued, the zoom runs on into the pan as one movement of the hand.
-    #
-    # The strokes are the other half of what the pointer is for: the wheel
-    # puts the summit under it, and the hand on the picture brings first the
-    # sky over the summit and then the tree at the picture's far edge into
-    # the frame. A drag pans by the negative of itself, so down is what
-    # brings the top down into view and right is what brings the left edge
-    # across, and the pan stops at the picture's edge whatever is asked of
-    # it — which is what the reach back between the two strokes relies on.
-    gesture wheel 2 -- rest 0.12 -- wheel 2 -- rest 0.12 -- wheel 2 \
-        -- rest 0.45 -- drag 0 "$down" \
-        -- rest 0.3 -- drag $((edge - px)) 0 \
-        -- rest 0.2 -- glide "$reach" $((py + down)) \
-        -- rest 0.2 -- drag $((edge - reach)) 0
-    pause 1.2
+    # Three turns of the wheel and the stroke that follows them on one
+    # device. A `wheel` and a `drag_along` of their own would be a device
+    # each, and half a second of the picture sitting still while each is made
+    # and taken away; queued, the zoom runs on into the pan as one movement
+    # of the hand.
+    gesture wheel 1 -- rest 0.12 -- wheel 1 -- rest 0.12 -- wheel 1 \
+        -- rest 0.11 -- drag_along "$PAN" $(arcing "$px" "$py" "$sweep" "$drop" 48)
+    pause 0.3
     note key Space
     keys space
     settle
-    pause 1.2
+    pause 0.3
 }
 
 # The bird, and the loupe on its eye. The loupe comes up under the pointer,
@@ -561,12 +645,15 @@ beat_bird() {
     keys bracketright
     stepped
     glide $(fitted 3032 2024 "$BREAST_X" "$BREAST_Y" "$LIST")
-    pause 0.5
+    pause 0.25
     note key l
     keys l
-    pause 0.8
+    pause 0.4
     glide $(fitted 3032 2024 "$EYE_X" "$EYE_Y" "$LIST")
-    pause 1.2
+    # Barely a pause: the loupe arrived on the eye with the pointer, and a
+    # hand that stops on it and waits says the film is waiting for something.
+    # The circle carries straight on out of the glide, as one movement.
+    pause 0.1
     note key 'Shift+L'
     keyboard
     # Once round the eye in three quarters of a second, the magnification
@@ -577,10 +664,10 @@ beat_bird() {
     # drawn it, is what comes to that long.
     gesture $(circling $(fitted 3032 2024 "$EYE_X" "$EYE_Y" "$LIST") \
         "$EYE_CIRCLE" 15)
-    pause 2
+    pause 1
     note key l
     keys l
-    pause 0.4
+    pause 0.2
 }
 
 # The chooser, and the raw frame with the sun in it. Ctrl+P is matched on
@@ -588,24 +675,33 @@ beat_bird() {
 beat_chooser() {
     note key 'Ctrl+P'
     press ctrl+p
-    pause 1
+    pause 0.5
     note key 'sun  Enter'
     PACE=0.18
     keys s u n
     unset PACE
-    pause 0.8
+    pause 0.4
     keys Return
     stepped
-    pause 0.5
+    pause 0.25
 }
 
-# The histogram, and the marks on the pixels the sun has taken to white,
-# both from their own buttons: the panel is what this beat is about, and a
-# button pressed says where the thing lives in a way a key never can. The
-# toggle is the first of the right strip, a bar's padding under the top
-# bar; the marks button is the one beside the band at the foot of the
-# panel's own strip, a panel's inset in from its left edge and centered on
-# the band — the same two the README's `histogram` film presses.
+# The histogram, the count axis put on a curve, and the marks on the pixels
+# the sun has taken to white — each from its own button, because the panel is
+# what this beat is about and a button pressed says where the thing lives in a
+# way a key never can. The toggle is the first of the right strip, a bar's
+# padding under the top bar; the other two are in the strip down the panel's
+# own left, a panel's inset in from its edge, so the hand stays in one column
+# once it is there.
+#
+# The log counts button is the third of that strip's stack — luminance,
+# planes, log, reset on a color file, 22 tall on a 6 gap from the top of the
+# plot, which puts it 137 down from the window's top where the marks button
+# is 195. It is pressed before the marks rather than after: what the marks
+# are about is a few thousand pixels at the white end against a peak of
+# millions in the midtones, which on a linear count axis is a plot with
+# nothing at its right-hand end at all. On a log axis the tail is there to be
+# seen, and the picture and the plot are then saying the same thing.
 #
 # Then the pointer comes off the panel, for two reasons: the button it was
 # on would raise its tooltip over the very marks it just painted, and the
@@ -613,16 +709,18 @@ beat_chooser() {
 # down on the water is one the display has taken to white. Everything after
 # this is keys, pressed from there.
 #
-# No captions over the two presses. The pointer is on screen doing them,
+# No captions over the three presses. The pointer is on screen doing them,
 # and a button under it says more than a word would.
 beat_clipping() {
     set -- $(window geometry)
-    gesture glide $(($1 + $3 - 15)) $(($2 + 45)) -- rest 0.5 -- click \
-        -- rest 1.2 \
-        -- glide $(($1 + $3 - 329)) $(($2 + 195)) -- rest 0.5 -- click \
-        -- rest 1.0 \
+    gesture glide $(($1 + $3 - 15)) $(($2 + 45)) -- rest 0.25 -- click \
+        -- rest 0.6 \
+        -- glide $(($1 + $3 - 329)) $(($2 + 137)) -- rest 0.25 -- click \
+        -- rest 0.6 \
+        -- glide $(($1 + $3 - 329)) $(($2 + 195)) -- rest 0.25 -- click \
+        -- rest 0.5 \
         -- glide $(fitted 3032 2024 "$GLINT_X" "$GLINT_Y" "$LIST")
-    pause 2.2
+    pause 1.3
 }
 
 # The marks off, and the file thrown away from the menu of the file — the
@@ -639,27 +737,31 @@ beat_clipping() {
 beat_delete() {
     note key w
     keys w
-    pause 1
+    pause 0.5
     set -- $(window geometry)
-    gesture glide $(($1 + 136)) $(($2 + 14)) -- rest 0.5 -- click \
-        -- rest 1.0 \
-        -- glide $(($1 + 180)) $(($2 + 214)) -- rest 0.6 -- click
+    gesture glide $(($1 + 136)) $(($2 + 14)) -- rest 0.25 -- click \
+        -- rest 0.5 \
+        -- glide $(($1 + 180)) $(($2 + 214)) -- rest 0.3 -- click
     stepped
-    pause 2.6
+    pause 1.3
 }
 
 # The histogram away — it has to be, or the information panel would be
-# stacked under it and come out shorter than the punch is cut for — and the
-# wheel into the crater. Four notches from a fit of 38% is about 92%.
+# stacked under it and start halfway down the picture — and the wheel into
+# the crater. Six notches from a fit of 42% is about 160%, half again as far
+# in as the four notches that landed on the raster's own pixels: past 100% a
+# picture of a mountain is being read rather than looked at, and 160% is
+# where the 12.5-metre posts the relief is made of are plainly what is on
+# screen.
 beat_crater() {
     note key h
     keys h
-    pause 0.5
+    pause 0.25
     glide $(fitted 4400 3760 "$CRATER_X" "$CRATER_Y" "$LIST")
-    pause 0.4
+    pause 0.2
     note key wheel
-    wheel 4 1.0
-    pause 1.5
+    wheel 6 1.0
+    pause 0.75
 }
 
 # Back up the chain the relief was made down: hillshade, then the elevation
@@ -676,99 +778,110 @@ beat_crater() {
 # readout in the bottom bar is of the elevation the next beat colors.
 beat_chain() {
     set -- $(window geometry)
-    gesture glide $(($1 + 76)) $(($2 + $(row 4))) -- rest 0.4 -- click
+    gesture glide $(($1 + 76)) $(($2 + $(row 4))) -- rest 0.2 -- click
     stepped
-    pause 1.4
-    gesture glide $(($1 + 76)) $(($2 + $(row 3))) -- rest 0.4 -- click
+    pause 0.7
+    gesture glide $(($1 + 76)) $(($2 + $(row 3))) -- rest 0.2 -- click
     stepped
-    pause 1.0
+    pause 0.5
     glide $(fitted 4400 3760 "$CRATER_X" "$CRATER_Y" "$LIST")
-    pause 0.8
+    pause 0.4
 }
 
 # False color on the elevation, where it means the most, and the panel that
-# says where on the mountain this is. The colormap is the file's own
-# setting and does not follow a step, so `r` is pressed on the picture it
-# is for.
+# says where on the mountain this is. The colormap is the file's own setting
+# and does not follow a step, so `r` is pressed on the picture it is for.
+#
+# Held wide, where this beat used to cut to a crop around the panel. What the
+# punch bought was a panel two fifths larger in the delivered frame; what it
+# cost was the desk — and the desk is the film's argument, so a beat that puts
+# it out of frame to make a column of metadata easier to read is paying in the
+# wrong currency. The panel is legible enough as it stands: 1518 of the
+# master's rows, which is 759 of the delivered frame's 1080.
 beat_panel() {
     note key r
     keys r
-    pause 1.8
-
-    # The punch, in the master's pixels, worked out from the window rather than
-    # written down: the panel is PANEL_WIDTH wide and as tall as the content area
-    # less its padding, anchored to the content's top right, and the crop is
-    # anchored to the window's right edge so that no background creeps into it and
-    # centered on the panel, which is what the 36 pixels either side come to.
-    punch=$(set -- $(window geometry) $(output master); awk \
-        -v wx="$1" -v wy="$2" -v ww="$3" -v wh="$4" -v mw="$5" -v mh="$6" \
-        -v mx="$MX" -v my="$MY" -v s="$(scale)" -v punch="$PUNCH" 'BEGIN {
-            bar = 30; pad = 12; panel = 308
-            top = (wy - my + bar + pad) * s
-            high = (wh - 2 * bar - 2 * pad) * s
-            right = (wx - mx + ww) * s
-            cw = int(mw / punch); ch = int(mh / punch)
-            cx = right - cw; cy = top - (ch - high) / 2
-            if (cx < 0) cx = 0; if (cx + cw > mw) cx = mw - cw
-            if (cy < 0) cy = 0; if (cy + ch > mh) cy = mh - ch
-            printf "%d:%d:%d:%d\n", cw, ch, cx, cy
-        }')
-
+    pause 0.9
     note key i
-    note crop "$punch"
     keys i
-    pause 4
+    pause 2
 }
 
 # Out to the whole desk again for the theme, which is the argument: the
-#  window is not themed, the desk is, and the window follows. Back on the
-#  theme it opened on, so that the film loops wide to wide on one palette.
+# window is not themed, the desk is, and the window follows. Back on the
+# theme it opened on, so that the film loops wide to wide on one palette.
+#
+# Between the two swaps the film goes on working under the new palette, which
+# is the other half of the argument: the chooser, and the relief map arriving
+# in a window that has just been re-themed under it. A film that cut straight
+# from one theme to the next would be showing a screenshot twice; a film that
+# does something between them is showing an application that was themed while
+# it was being used.
+#
+# The relief was left at the crater by the chain, and a file keeps its own
+# display, so the chooser lands back on that view rather than on a fit.
 beat_theme() {
-    note crop wide
-    pause 0.3
+    pause 0.15
     swap "theme menu" $(letters "$AWAY")
+
+    note key 'Ctrl+P'
+    press ctrl+p
+    pause 0.5
+    note key 'relief  Enter'
+    PACE=0.18
+    keys r e l i e f
+    unset PACE
+    pause 0.4
+    keys Return
+    stepped
+    pause 1
+
     swap "theme menu" $(letters "$WAS_THEME")
-    pause 2.5
+    pause 1.25
 }
 
-REHEARSING=yes
-rehearsed=no
-for beat in $BEATS; do
-    case " $filmed " in
-        *" $beat "*)
-            # The first beat asked for is where the recorder comes on.
-            if [ "$REHEARSING" = yes ]; then
-                REHEARSING=no
-                if [ "$FILM" = yes ]; then
-                    FRAME=$(output frame)
-                    rm -f "$EDL"
-                    resting_x=${CURSOR_X:-}
-                    resting_y=${CURSOR_Y:-}
-                    record "showcase.mp4" cursor
-                    # `record` parks the pointer on the top bar before it
-                    # starts, which after a rehearsal would throw away
-                    # wherever the beats before this one left it — over the
-                    # crater, over the sun. Put it back, at the cost of the
-                    # first moment of a part-film having it arrive.
-                    if [ "$rehearsed" = yes ] && [ -n "$resting_x" ]; then
-                        cursor "$resting_x" "$resting_y"
-                        sleep 0.4
+# The film itself: every beat in turn, the recorder coming on at the first one
+# asked for and the master closed after the last.
+filming() {
+    REHEARSING=yes
+    rehearsed=no
+    for beat in $BEATS; do
+        case " $filmed " in
+            *" $beat "*)
+                # The first beat asked for is where the recorder comes on.
+                if [ "$REHEARSING" = yes ]; then
+                    REHEARSING=no
+                    if [ "$FILM" = yes ]; then
+                        FRAME=$(output frame)
+                        rm -f "$EDL"
+                        resting_x=${CURSOR_X:-}
+                        resting_y=${CURSOR_Y:-}
+                        record "showcase.mp4" cursor
+                        # `record` parks the pointer on the top bar before it
+                        # starts, which after a rehearsal would throw away
+                        # wherever the beats before this one left it — over the
+                        # crater, over the sun. Put it back, at the cost of the
+                        # first moment of a part-film having it arrive.
+                        if [ "$rehearsed" = yes ] && [ -n "$resting_x" ]; then
+                            cursor "$resting_x" "$resting_y"
+                            sleep 0.4
+                        fi
+                        note master "$(output master | tr ' ' x)"
+                        note crop wide
                     fi
-                    note master "$(output master | tr ' ' x)"
-                    note crop wide
                 fi
-            fi
-            ;;
-        *) rehearsed=yes ;;
-    esac
-    "beat_$beat"
-    [ "$beat" = "$last" ] && break
-done
+                ;;
+            *) rehearsed=yes ;;
+        esac
+        "beat_$beat"
+        [ "$beat" = "$last" ] && break
+    done
 
-note end -
-film=
-[ "$FILM" = yes ] && film=$(cut)
-close
+    note end -
+    film=
+    [ "$FILM" = yes ] && film=$(cut)
+    close
+}
 
 # The film cut by the list beside it: one pass, each segment trimmed and
 # cropped on its own and the segments concatenated, so that all of them leave
@@ -850,7 +963,15 @@ deliver() {
                 printf ":text=%s%s%s", quote, caption[i], quote
                 printf ":fontsize=46:fontcolor=white@0.95"
                 printf ":box=1:boxcolor=black@0.5:boxborderw=20"
-                printf ":x=(w-tw)/2:y=h-th-72"
+                # Along the foot of the frame, in the band of desk the window
+                # leaves between itself and the bottom of the screen: the
+                # window is centred in what the bar leaves, so there are
+                # something over a hundred rows down there with nothing in
+                # them, and a caption standing in them is over the desk
+                # rather than over the picture. The box ends h - 6 whatever
+                # the text measures — its height is in the y and cancels —
+                # so what is placed is the box and not the words in it.
+                printf ":x=(w-tw)/2:y=h-th-26"
                 printf ":enable=%sbetween(t,%s,%s)%s", quote, at_key[i], gone, quote
             }
             printf "[out]\n"
@@ -861,8 +982,22 @@ deliver() {
     echo "$SCREENSHOTS/$3"
 }
 
+# A run that says `post` cuts the film that is already there and stops. What
+# `deliver` does is arithmetic over the edit list beside the master, so a
+# caption moved or a crop retimed can be seen in a minute without standing the
+# desk up and filming the whole thing again. The desk is not touched.
+if [ "$POST" = yes ]; then
+    [ -f "$FILMS/showcase.mp4" ] || { echo "no film at $FILMS/showcase.mp4 to cut" >&2; exit 1; }
+    [ -f "$EDL" ] || { echo "no edit list at $EDL to cut it by" >&2; exit 1; }
+    deliver "$FILMS/showcase.mp4" "$EDL" "showcase.mp4"
+    exit 0
+fi
+
+staged
+filming
+
 # Only a whole film is worth cutting: a run of a beat or two is for watching
-# the beat, and the captions and the punch are the whole film's arithmetic.
+# the beat, and the captions are the whole film's arithmetic.
 if [ "$whole" = yes ] && [ "$FILM" = yes ]; then
     deliver "$film" "$EDL" "showcase.mp4"
 elif [ -n "$film" ]; then

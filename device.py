@@ -26,6 +26,10 @@ A key from here is the real keycode, read under the real keymap.
     device.py drag_to X Y [placed]
                                the left button held while the pointer glides to X, Y —
                                and is placed there, if asked, before it is let go
+    device.py drag_along [S] X Y X Y ...
+                               the same held through every mark in turn, so that the
+                               hand draws a curve and the window sees one stroke;
+                               over S seconds, rather than at the pointer's own pace
     device.py click            the left button pressed and released
     device.py key CHORD        a key by its position, with modifiers: 2, shift+2, ctrl+shift+c
     device.py rest S [T]       nothing, for S seconds, or for somewhere between S and T:
@@ -115,6 +119,13 @@ UNIT = 0.25
 # and a hand does not take twice as long to do it.
 PACE = int(os.environ.get("POINTER_PACE", 16))
 EASE = 0.7
+
+# How long a step of a motion waits before the next, about a frame at 60 and
+# so an event or two in every frame the window draws. A motion given a time
+# to take keeps this rate and shortens its steps, rather than keeping PACE
+# and waiting longer between them: what a pan is filmed to show is a picture
+# that moves in every frame.
+STEP = 0.012
 
 # The least a key press waits before the next, and the most: a hand does
 # not press a key ten times at a metronome's beat.
@@ -206,7 +217,7 @@ class Device:
             self.emit(EV_REL, REL_Y, to[1] - gone[1])
             self.sync()
             gone = to
-            time.sleep(0.012)
+            time.sleep(STEP)
         self.at[0] += ux * UNIT
         self.at[1] += uy * UNIT
 
@@ -296,6 +307,70 @@ class Device:
             time.sleep(0.1)
         self.button(False)
 
+    def along(self, marks, seconds=None):
+        # The pointer through every mark in turn as one motion: one pace and
+        # one easing over the whole path, rather than a glide to each mark.
+        #
+        # A glide is a motion of its own — it eases in, eases out, and waits
+        # to be heard at the end — so a path walked glide by glide is as many
+        # little starts and stops as it has marks, which is a stutter in the
+        # one beat filmed to show that panning does not stutter. Here the
+        # marks are only the shape of the path: the distance along it is what
+        # is parted into steps, and the easing is applied to that distance, so
+        # the pointer sets off once and stops once however many marks it is
+        # given, and a hundred marks are as smooth as two.
+        #
+        # SECONDS spends that many seconds on the path, at the same step rate
+        # and so in shorter steps; without it the steps are PACE long and the
+        # path takes as long as it takes.
+        path = [(self.at[0], self.at[1])] + [(float(x), float(y)) for x, y in marks]
+        legs = [math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(path, path[1:])]
+        total = sum(legs)
+        if total == 0:
+            return
+        steps = max(1, round(seconds / STEP)) if seconds else max(1, int(total / PACE))
+        start = path[0]
+        gone = [0, 0]
+        leg = 0
+        behind = 0.0
+        for i in range(1, steps + 1):
+            t = i / steps
+            f = (1 - EASE) * t + EASE * t * t * (3 - 2 * t)
+            want = f * total
+            # The leg this far along the path falls in, the legs before it
+            # counted off as they are passed: the marks are walked once
+            # between them all, not searched for at every step.
+            while leg < len(legs) - 1 and want > behind + legs[leg]:
+                behind += legs[leg]
+                leg += 1
+            a, b = path[leg], path[leg + 1]
+            part = 0.0 if legs[leg] == 0 else min(1.0, (want - behind) / legs[leg])
+            to = (a[0] + (b[0] - a[0]) * part, a[1] + (b[1] - a[1]) * part)
+            ux = round((to[0] - start[0]) / UNIT)
+            uy = round((to[1] - start[1]) / UNIT)
+            if ux != gone[0] or uy != gone[1]:
+                self.emit(EV_REL, REL_X, ux - gone[0])
+                self.emit(EV_REL, REL_Y, uy - gone[1])
+                self.sync()
+                gone = [ux, uy]
+            time.sleep(STEP)
+        self.at[0] = start[0] + gone[0] * UNIT
+        self.at[1] = start[1] + gone[1] * UNIT
+
+    def drag_along(self, marks, seconds=None):
+        # A drag through several points rather than to one, the button down
+        # once and up once, so that what the window is given is a single
+        # stroke along whatever path the marks describe — an arc, where a
+        # straight `drag_to` would be its chord. The press, the creep into
+        # the path and the hold before the release are `drag_to`'s, and are
+        # there for its reasons.
+        self.button(True)
+        time.sleep(0.02)
+        self.creep(*marks[0])
+        self.along(marks, seconds)
+        time.sleep(0.1)
+        self.button(False)
+
     def creep(self, x, y):
         # A toolkit takes a press for a click until the pointer has gone
         # some way from it — six logical pixels, for egui — and only then
@@ -343,6 +418,11 @@ class Device:
         time.sleep(random.uniform(*KEY_GAP))
 
 
+def pairs(marks):
+    """A flat list of numbers as the points they are, two by two."""
+    return [(float(marks[i]), float(marks[i + 1])) for i in range(0, len(marks), 2)]
+
+
 def main(argv):
     if len(argv) < 2:
         sys.exit(__doc__)
@@ -370,6 +450,10 @@ def main(argv):
                     device.drag_to(float(x), float(y))
                 case ["drag_to", x, y, "placed"]:
                     device.drag_to(float(x), float(y), placed=True)
+                case ["drag_along", *marks] if len(marks) >= 2 and len(marks) % 2 == 0:
+                    device.drag_along(pairs(marks))
+                case ["drag_along", seconds, *marks] if len(marks) >= 2 and len(marks) % 2 == 0:
+                    device.drag_along(pairs(marks), float(seconds))
                 case ["click"]:
                     device.click()
                 case ["key", chord]:
