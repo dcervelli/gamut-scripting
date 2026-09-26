@@ -28,6 +28,7 @@ is what changes the picture there.
 | `export` | the mountain's shaded relief under the viridis ramp, a box dragged out a thousand pixels square around the summit, and Export chosen from the file menu: the dialog's first size box set to 25%, and the quarter-size crop written, shown as it lands, and put at its own size |
 | `loupe` | the first of the bird plates, the loupe's toggle in the bottom bar clicked, the pointer glided onto the lower bird's eye, and `Shift+L` pressed 300 ms apart round its four magnifications and back to 4×, then the loupe glided down to the foot |
 | `performance` | a fresh terminal and the window it opens, side by side: `gamut --timing` on a 443 MB Swiss map typed at the prompt, Return, and the timing marks arriving on the left as the map comes up on the right |
+| `showcase` | the whole desk rather than the one window, on an empty workspace at scale 2: six pictures of one mountain opened once and walked through — the summit under the wheel, the loupe on a bird's eye, the sun's clipped pixels painted and the frame thrown away, the crater held up the three rasters, the panel that says where on the mountain it is — and Omarchy's own theme menu retinting the desk and the window with it at the end |
 
 ```sh
 ./main_screenshot                       # screenshots/main_screenshot.jpg
@@ -36,13 +37,15 @@ SCREENSHOTS=/tmp/shots ./false_color    # to another directory
 ./all                                   # every one of them, in the order above
 ```
 
-Three things are the environment's to say, each with a default:
+Five things are the environment's to say, each with a default:
 
 | variable | what | default |
 | --- | --- | --- |
 | `GAMUT` | the binary to drive | `~/git/gamut/target/release/gamut` |
 | `SCREENSHOTS` | where the pictures go | `screenshots/` here |
 | `FILMS` | where the recordings go before they are GIFs | `films/` here, ignored by git |
+| `CODEC` | what `record` encodes in | `h264` |
+| `QUALITY` | what it encodes at | the recorder's own default |
 
 The pictures they open are in `images/`: seven of one mountain in
 `images/mora` — a photograph, two raw frames, an aerial and the three

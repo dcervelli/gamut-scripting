@@ -1,0 +1,870 @@
+#!/bin/sh
+# The showcase film: half a minute of the whole desktop, ending on Omarchy's
+# theme menu retinting everything including gamut. Unlike every other script
+# here it films the monitor rather than the window, because what it argues is
+# that gamut belongs on this desk.
+#
+# It films one monitor and is driven from a terminal on the other, so the
+# thing typing the keys is off camera. It puts the filmed monitor on an empty
+# workspace, where the desk's own background stands behind the window, and on
+# scale 2, where the logical desktop is exactly 1920x1080 — the delivery grid
+# — so that one logical pixel is one delivered pixel rendered at 2x and
+# downsampled 2:1, which is sharper than any capture taken at 1080p. Scale 2
+# is a whole number, so every logical pixel is a whole device pixel and
+# `placement`'s alignment nudge has nothing to do. Both the workspace and the
+# scale are put back however the run ends.
+#
+# The pictures are a directory of symlinks it builds and takes away again,
+# because the film deletes one of them. Del moves the file on screen to the
+# desk's trash, and what it has to be able to move is a link this script made
+# rather than one of the pictures the repository keeps: the trash renames the
+# link and never looks through it, so the picture does not move, and the link
+# is lifted back out of the trash on the way out. The file thrown away is also
+# the one standing between the hillshade and the relief in name order, so the
+# walk through the three rasters closes up behind it — the film tidies its own
+# list rather than being handed a list arranged to look tidy.
+#
+# The master is the monitor at 3840x2160 and the delivery is 1920x1080, which
+# is what pays for the punch-in: a crop wider than 1920 is still a downscale
+# to delivery and therefore still sharp, so 1.5x costs nothing. Beside the
+# master goes an edit list — what was pressed and when, in seconds from the
+# first frame, and where the crop went — and `deliver` cuts the film by it,
+# so the edit is reproducible the way the screenshots are. The captions are
+# burned in rather than overlaid live, since the film plays muted and neither
+# key-overlay program on this desk is installed or would stay off the
+# compositor's own bindings.
+#
+# A run with no argument films the whole thing and cuts it. A run that names
+# beats films those and stops after the last of them, and leaves the master
+# uncut — the captions and the punch are arithmetic over the whole film, and a
+# beat being worked on is for watching. The beats before the first one asked
+# for are still run, since the window has to be in the state that beat starts
+# from, but with their pauses cut short. `FILM=no` skips the recorder
+# altogether, which is the quickest way round the loop: the beat happens on
+# screen and nothing is encoded.
+#
+#   ./showcase                    the whole film, cut, on HDMI-A-1, workspace 4
+#   ./showcase bird               that beat alone, recorded, left uncut
+#   FILM=no ./showcase bird       that beat alone, just watched
+#   ./showcase crater chain       from one to the other
+#   MONITOR=DP-2 ./showcase       films the other monitor
+#   WORKSPACE=9 ./showcase        on another empty workspace
+#   AWAY='Rose Pine' ./showcase   swapping to another theme and back
+#
+# The beats, in order:
+#
+#   interface  the window on the desk, the list and the bars taken away
+#   summit     the wheel into the summit, the pan across, and Space back out
+#   bird       the loupe on the eye, and round it as it magnifies
+#   chooser    Ctrl+P to the sunrise raw
+#   clipping   the histogram and the marks, off their own buttons
+#   delete     the marks off and the frame thrown away from its menu
+#   crater     the histogram away and the wheel into the crater
+#   chain      back up through hillshade and elevation, off the list
+#   panel      false color, the information panel, and the punch in
+#   theme      Omarchy's theme menu, and back to the theme it opened on
+
+. "$(dirname "$0")/lib.sh"
+
+MONITOR=${MONITOR:-HDMI-A-1}
+WORKSPACE=${WORKSPACE:-4}
+AWAY=${AWAY:-Lupine}
+
+# The master is a whole 4K frame rather than the fraction of one a window
+# film is, which is where the recorder's defaults show. hevc holds the
+# quality at a size worth keeping around; the delivered film is h264, which
+# is what plays everywhere.
+# The pointer, half again as fast as the window films move it. This one
+# crosses a 1400-pixel window and a whole desk rather than a 1000-pixel
+# window, and a hand does not take half as long again to do it. Exported:
+# `device.py` is a process of its own.
+export POINTER_PACE=${POINTER_PACE:-24}
+
+# Whether to record at all. A beat being worked on is quicker watched as it
+# happens than encoded first and opened afterwards.
+FILM=${FILM:-yes}
+
+CODEC=${CODEC:-hevc}
+QUALITY=${QUALITY:-ultra}
+
+# The window, in logical pixels. 1400 across leaves 260 of background either
+# side and lands within about a tenth of the pixel density the window films in
+# `films/` already ship, which is why the film opens wide and has nothing to
+# punch in for. 768 down is what lets the one punch-in hold the information
+# panel: the panel is as tall as the content area less its padding, always, so
+# at 800 it would be 1432 of the master's pixels tall and a 1440-tall crop
+# would hold it with four pixels to spare either side.
+WIDTH=1400
+HEIGHT=768
+# What the punch tightens by. 2.0 would be a 1920x1080 crop, which is the
+# delivery grid exactly and therefore the most that is not an upscale — but it
+# is also shorter than the panel, so it would cut a quarter of it off.
+PUNCH=1.5
+# How long the push in takes, and the pull out at the other end of it. A cut
+# straight to the crop is a jump the eye reads as a mistake; half a second of
+# movement reads as a camera.
+RAMP=0.5
+
+# Where the pointer goes in each picture, in that picture's own pixels.
+SUMMIT_X=1500; SUMMIT_Y=340        # mora.jpg, 3008x2000
+SUMMIT_NOTCHES=6                   # a fit of 71%, and 1.25^6, is about 270%
+BREAST_X=950; BREAST_Y=950         # mora_bird.dng, 3032x2024
+EYE_X=1011; EYE_Y=455
+EYE_CIRCLE=10                      # how wide the hand wanders while the loupe changes
+# The sun's own disc is behind the histogram panel once that is open, so
+# the pointer goes to its reflection on the water instead, which is under
+# nothing, is clipped just as hard, and is the same story about the same
+# light.
+GLINT_X=2352; GLINT_Y=1787         # mora_reflection_lake_sunrise.dng, 3032x2024
+CRATER_X=2340; CRATER_Y=2260       # the three rasters, 4400x3760
+
+# The beats, in the order they are filmed in. A run that names none of them
+# films all of them and cuts the film; a run that names some films those and
+# leaves the master where it lies, for watching one beat over and over while
+# its timings are worked out.
+BEATS="interface summit bird chooser clipping delete crater chain panel theme"
+
+if [ $# -eq 0 ]; then
+    filmed=$BEATS
+    whole=yes
+else
+    filmed=$*
+    whole=no
+fi
+
+# The last beat asked for, in the order above rather than the order asked in:
+# what the run stops after. A name that is not a beat is worth saying so
+# rather than quietly filming nothing.
+last=
+for beat in $BEATS; do
+    case " $filmed " in *" $beat "*) last=$beat ;; esac
+done
+for beat in $filmed; do
+    case " $BEATS " in
+        *" $beat "*) ;;
+        *) echo "showcase: no beat called $beat; they are: $BEATS" >&2; exit 1 ;;
+    esac
+done
+
+for tool in omarchy-menu omarchy-theme-set omarchy-theme-current; do
+    command -v "$tool" >/dev/null || { echo "$tool is not installed" >&2; exit 1; }
+done
+
+# The room either side of a thumbnail and the scrollbar's gutter beside it:
+# what the file list takes off the left of the content area, which `fitted`
+# has to be told, since the list is up throughout — with six files it is a
+# column worth reading rather than a scrollbar, the step from one picture to
+# the next shows in it, and the deletion takes a row out of it on camera.
+state=${XDG_STATE_HOME:-$HOME/.local/state}/gamut/state
+slot=
+[ -f "$state" ] && slot=$(awk -F '[ =]+' '$1 == "filmstrip_width" { print int($2) }' "$state")
+slot=${slot:-148}
+LIST=$((slot + 2 * 8 + 10))
+
+# How far to drag the picture down, in logical pixels, to bring its top edge
+# to the top of the viewport: after NOTCHES turns of the wheel about image
+# pixel Y of a W by H picture that was fitted to the window, with the file
+# list down the left.
+#
+# The same sum `fitted` does, carried two steps further — where the pixel
+# under the pointer sits below the viewport's top, how far the picture's top
+# edge is above that pixel once the wheel has been turned, and the difference
+# — plus a little over, the pan stopping at the image's edge by itself.
+panned() {
+    set -- "$1" "$2" "$3" "$4" $(window geometry) $(scale)
+    awk -v W="$1" -v H="$2" -v Y="$3" -v notches="$4" -v list="$LIST" \
+        -v ww="$7" -v wh="$8" -v scale="$9" -v bar=30 -v step=1.25 'BEGIN {
+        vw = (ww - 2 * bar - list) * scale; vh = (wh - 2 * bar) * scale
+        fit = vw / W; if (vh / H < fit) fit = vh / H
+        below = (vh - H * fit) / 2 + Y * fit
+        printf "%d\n", (Y * fit * step ^ notches - below) / scale + 30
+    }'
+}
+
+# The same sum across instead of down: how far to drag the picture right, in
+# logical pixels, to bring its left edge to the left of the viewport. More
+# than a stroke of the hand can cover on a 1920-pixel desk, so the beat takes
+# it in two; the margin is doubled for that, a stroke losing its first pixels
+# to the toolkit's drag threshold and there being two of them now.
+swept() {
+    set -- "$1" "$2" "$3" "$4" $(window geometry) $(scale)
+    awk -v W="$1" -v H="$2" -v X="$3" -v notches="$4" -v list="$LIST" \
+        -v ww="$7" -v wh="$8" -v scale="$9" -v bar=30 -v step=1.25 'BEGIN {
+        vw = (ww - 2 * bar - list) * scale; vh = (wh - 2 * bar) * scale
+        fit = vw / W; if (vh / H < fit) fit = vh / H
+        right = (vw - W * fit) / 2 + X * fit
+        printf "%d\n", (X * fit * step ^ notches - right) / scale + 60
+    }'
+}
+
+# The middle of the Nth slot in the file list, in logical pixels down from
+# the window's top: the top bar and the list's head, then a row for every
+# file above it — a title, the picture fitted to the slot's width, and the
+# room over and under them.
+#
+# The shapes are the curated files' own, in the order the list sorts them
+# and as the list has them once the file thrown away is gone: the two
+# cameras' three by two, and the three rasters' 4400 by 3760. Until the
+# thumbnail thread has read a header the slot is square, which it has long
+# since done by the time the film asks; and the five rows come to 763 of
+# the 768 the strip has, so the list is never scrolled and a row is where
+# this says it is.
+row() {
+    awk -v n="$1" -v slot="$slot" 'BEGIN {
+        split("0.6649 0.6675 0.8545 0.8545 0.8545", shape, " ")
+        y = 30 + 30
+        for (i = 1; i < n; i++) y += 22 + 4 + int(slot * shape[i] + 0.5) + 8
+        printf "%d\n", y + 22 + 4 + int(slot * shape[n] + 0.5) / 2
+    }'
+}
+
+# The pointer once round a circle of RADIUS about X, Y in STEPS glides, as
+# words for `gesture`, with `Shift+L` pressed at the first and second
+# thirds of the way round.
+#
+# The loupe is drawn where the pointer is and magnifies whatever is under
+# it, so a hand still moving while the magnification changes says both
+# things at once, where a frozen pointer and a picture that blinks says
+# neither clearly. A circle rather than a wander: it comes back to where it
+# started, so the beat after it begins where this one began.
+circling() {
+    awk -v cx="$1" -v cy="$2" -v r="$3" -v steps="$4" 'BEGIN {
+        for (i = 1; i <= steps; i++) {
+            a = 2 * 3.14159265 * i / steps
+            printf "%sglide %.1f %.1f", (i > 1 ? " -- " : ""), \
+                cx + r * sin(a), cy - r * cos(a)
+            if (i == int(steps / 3) || i == int(2 * steps / 3))
+                printf " -- key shift+l"
+        }
+        printf "\n"
+    }'
+}
+
+# One field of the monitor being filmed, as `window` is one field of the
+# window: a number by name, or `frame` for its rectangle in logical pixels,
+# which is what `record` captures, or `master` for the size that rectangle
+# comes out at, which is what the crop is measured in.
+output() {
+    hyprctl monitors -j | jq -r --arg name "$MONITOR" "
+        .[] | select(.name == \$name) | $(case $1 in
+            frame) echo '"\(.x) \(.y) \(.width / .scale | floor) \(.height / .scale | floor)"' ;;
+            master) echo '"\(.width) \(.height)"' ;;
+            *) echo ".$1" ;;
+        esac)"
+}
+
+# Put the monitor being filmed on SCALE, and wait until it is there.
+#
+# Through the Lua API, because `hyprctl keyword monitor` is refused under a
+# Lua configuration: it prints "keyword can't work with non-legacy parsers"
+# and exits 0, so a restore written that way does nothing and says nothing,
+# and leaves the desk at the film's scale. The change is read back rather than
+# trusted for the same reason, and a failure is reported rather than raised,
+# since this is also what runs on the way out.
+scaled() {
+    hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"$MODE\",
+        position = \"auto\", scale = $1 })" >/dev/null
+    for _ in $(seq 30); do
+        [ "$(output scale)" = "$1" ] && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+# Pin the scale in the file a reload will read, and put the file back.
+#
+# Setting a theme runs `omarchy-restart-hyprctl`, which is `hyprctl reload`,
+# which re-reads the configuration and puts back everything set at runtime —
+# including the scale this film depends on. The last thing the configuration
+# reads is HyprMon's generated `hyprmon.lua`, which names a scale per monitor,
+# so the film's scale is written in there for the length of the run and the
+# file restored byte for byte afterwards. Nothing else survives a reload
+# either, which is what `reasserted` is for.
+HYPRMON=$HOME/.config/hypr/hyprmon.lua
+HYPRMON_SAVED=
+pinned() {
+    [ -f "$HYPRMON" ] || return 0
+    HYPRMON_SAVED=$FILMS/hyprmon.lua.showcase
+    mkdir -p "$FILMS"
+    cp "$HYPRMON" "$HYPRMON_SAVED"
+    awk -v name="$MONITOR" -v scale="$1" '
+        index($0, "output = \"" name "\"") { sub(/scale = [0-9.]+/, "scale = " scale) }
+        { print }' "$HYPRMON_SAVED" > "$HYPRMON"
+}
+
+unpinned() {
+    [ -n "$HYPRMON_SAVED" ] || return 0
+    cp "$HYPRMON_SAVED" "$HYPRMON"
+    rm -f "$HYPRMON_SAVED"
+    HYPRMON_SAVED=
+}
+
+# What a reload puts back that this film wants kept: the pointer on screen
+# while keys are pressed, and the scale, in case there was no `hyprmon.lua` to
+# write it into.
+reasserted() {
+    hyprctl eval 'hl.config({ cursor = { hide_on_key_press = false } })' >/dev/null
+    [ "$(output scale)" = "2" ] || scaled 2 || true
+}
+
+# Show a workspace on the monitor being filmed. Which monitor a workspace
+# comes up on is the workspace rules' to say — Omarchy's pin 1 to 5 to the
+# first monitor and 6 to 10 to the second — so WORKSPACE has to be one of the
+# monitor's own, and empty, or the film has someone else's windows in it.
+showing() {
+    hyprctl eval "hl.dispatch(hl.dsp.focus({ workspace = \"$1\" }))" >/dev/null
+    sleep 0.4
+}
+
+# The pictures, in the order their names put them, and the one the film
+# throws away between the hillshade and the relief.
+CURATED=$FILMS/showcase
+PLATES="mora.jpg
+        mora_bird.dng
+        mora_dem_12.5m_utm10.tif
+        mora_hillshade_12.5m.tif
+        mora_reflection_lake_sunrise.dng
+        mora_relief_12.5m_smr50.png"
+
+# Under $FILMS rather than in a temporary directory, for two reasons. The
+# trash moves a file by renaming it, which wants the same filesystem as the
+# trash itself, and /tmp is not; and the thumbnail cache is keyed on a file's
+# path and the modification time behind the link, so a directory whose name
+# does not change between runs is thumbnailed once rather than once a take.
+curate() {
+    rm -rf "$CURATED"
+    mkdir -p "$CURATED"
+    for plate in $PLATES; do
+        [ -f "$ROOT/images/mora/$plate" ] || {
+            echo "no $plate in images/mora" >&2
+            exit 1
+        }
+        ln -s "$ROOT/images/mora/$plate" "$CURATED/$plate"
+    done
+}
+
+# Whatever this run put in the desk's trash, taken back out: the entries whose
+# .trashinfo says they came from the directory this run built. Matched on
+# where a file came from rather than on what it is called, so that nothing
+# anyone else threw away is touched.
+untrash() {
+    trash=${XDG_DATA_HOME:-$HOME/.local/share}/Trash
+    for info in "$trash"/info/*.trashinfo; do
+        [ -e "$info" ] || continue
+        name=${info##*/}
+        name=${name%.trashinfo}
+        while IFS= read -r line; do
+            case $line in
+                "Path=$CURATED/"*)
+                    rm -f "$trash/files/$name" "$info"
+                    break
+                    ;;
+            esac
+        done < "$info"
+    done
+}
+
+WAS_SCALE=
+WAS_WORKSPACE=
+WAS_THEME=
+restore() {
+    [ -z "$WAS_THEME" ] || [ "$(omarchy-theme-current)" = "$WAS_THEME" ] ||
+        omarchy-theme-set "$WAS_THEME" >/dev/null 2>&1 || true
+    [ -z "$WAS_SCALE" ] || scaled "$WAS_SCALE" ||
+        echo "$MONITOR is still at scale $(output scale); put it back with" \
+             "hyprctl eval 'hl.monitor({ output = \"$MONITOR\", mode = \"$MODE\"," \
+             "position = \"auto\", scale = $WAS_SCALE })'" >&2
+    [ -z "$WAS_WORKSPACE" ] || showing "$WAS_WORKSPACE"
+    unpinned
+    untrash
+    rm -rf "$CURATED"
+    cleanup
+}
+trap restore EXIT
+
+# Wait for a step to another file to arrive. `loaded` watches the title, which
+# says "loading" until the picture is up — but not in the same breath as the
+# key, so it is given a moment to start saying it first.
+stepped() {
+    sleep 0.3
+    loaded
+}
+
+# A beat's own pacing. While the beats before the one being filmed are run —
+# the window has to be in the state that beat starts from, and running them is
+# the only way to be sure it is the same state the whole film leaves it in —
+# they are hurried along, nobody being on the other side of them.
+REHEARSING=no
+pause() {
+    case $REHEARSING in yes) sleep 0.15 ;; *) sleep "$1" ;; esac
+}
+
+# What was pressed and when, in seconds from the recording's first frame, and
+# where the crop goes with it: everything `deliver` needs to cut the film,
+# written as the film happens rather than counted off it afterwards.
+EDL=$FILMS/showcase.edl
+note() {
+    [ -n "${RECORDING_STARTED:-}" ] || return 0
+    printf '%s %s %s\n' "$1" "$(since_record)" "$2" >> "$EDL"
+}
+
+# Keys for a menu rather than for the window. `keys` makes sure the window
+# still has the keyboard before it sends anything, and while the menu is up it
+# does not — putting the pointer back in the window is exactly what would take
+# the menu down.
+menu_keys() {
+    for key; do
+        wtype -k "$key"
+        sleep "${PACE:-0.12}"
+    done
+}
+
+# The first few letters of a theme's name, one per line, as the keys that
+# narrow the menu to it: the menu filters on what is typed, and four letters
+# tell every theme on this desk apart. Letters only — a name with a space or
+# a number in it would otherwise ask for a key by a name wtype has not got —
+# and no `cut`, which `lib.sh` has already taken for stopping the recorder.
+letters() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z' | fold -w 1 | head -4
+}
+
+# Omarchy's own theme menu — the one everybody recognises — summoned by the
+# command its binding runs rather than by the binding, so that the film need
+# not press Super+Shift+Ctrl+Space and the captions need not explain it.
+# `summon` rather than `toggle`, which would close a menu something else had
+# already opened. The theme reaches the window through a watch on the palette
+# file, a second or so behind the menu.
+swap() {
+    note key "$1"
+    shift
+    omarchy-menu summon style.theme >/dev/null 2>&1 &
+    sleep 1.5
+    menu_keys "$@"
+    sleep 0.6
+    menu_keys Return
+    sleep 1.5
+    reasserted
+    sleep 1
+}
+
+MODE=$(hyprctl monitors -j | jq -r --arg n "$MONITOR" \
+    '.[] | select(.name == $n) | "\(.width)x\(.height)@\(.refreshRate * 100 | round / 100)"')
+[ -n "$MODE" ] || { echo "there is no monitor called $MONITOR" >&2; exit 1; }
+
+WAS_THEME=$(omarchy-theme-current)
+WAS_WORKSPACE=$(output activeWorkspace.name)
+WAS_SCALE=$(output scale)
+
+showing "$WORKSPACE"
+pinned 2
+scaled 2 || { echo "$MONITOR would not go to scale 2" >&2; exit 1; }
+curate
+
+# The pointer goes onto the filmed monitor before anything is opened: `open`
+# puts the window on the focused monitor, and focus follows the pointer, so
+# with the pointer still over the driving terminal the window would come up on
+# the other monitor, off camera.
+set -- $(output frame)
+MX=$1; MY=$2
+warp $((MX + $3 / 2)) $((MY + $4 / 2))
+sleep 0.5
+
+open "$WIDTH" "$HEIGHT" "$CURATED"
+# The film has the pointer in it throughout, and the desk hides the pointer
+# whenever a key is pressed; put back however this ends.
+keep_pointer
+
+# The window on the desk, and what the interface is: the file list put away
+# from the toggle at the head of the top bar, then the bars themselves from
+# the button at the other end of it, which leaves the picture alone on the
+# desk and says how to bring them back. Esc is what does — the message says
+# so — and Tab brings the list back after it.
+#
+# The pointer travels to each button rather than jumping, and rests on it
+# long enough for its tooltip, since a button that says what it is before
+# it is pressed is the thing being shown. The two presses want no caption:
+# the pointer is on screen doing them, which is more than a caption would
+# say.
+beat_interface() {
+    pause 1
+    set -- $(window geometry)
+    # One hand rather than four: a glide and a click each make a device of their
+    # own, and half a second of nothing goes by while each is made and taken
+    # away. The rests are what the film wants between them anyway.
+    gesture glide $(($1 + 15)) $(($2 + 15)) -- rest 0.9 -- click -- rest 1.3 \
+        -- glide $(($1 + $3 - 15)) $(($2 + 15)) -- rest 0.9 -- click
+    pause 2.2
+    note key Esc
+    keys Escape
+    pause 1.1
+    note key Tab
+    keys Tab
+    pause 1.1
+}
+
+# Into the summit, across to the tree, and back out. Six notches from a fit
+# of 71% is about 270%. Space is CycleFit, and after a wheel zoom the fit is
+# none, so one press goes to the whole picture.
+beat_summit() {
+    set -- $(fitted 3008 2000 "$SUMMIT_X" "$SUMMIT_Y" "$LIST")
+    px=$1; py=$2
+    glide "$px" "$py"
+    pause 0.4
+
+    # Where the two strokes of the pan across the picture start and end. A
+    # stroke may go as far as the window's own edge and no further, the
+    # pointer having to stay on the picture for the drag to be one; so the
+    # first stroke runs from where the pointer is to that edge, and the hand
+    # reaches back far enough for the second to finish there too. If the
+    # reach would be further than the viewport's left, it stops there and the
+    # pan ends a little short of the picture's edge rather than the pointer
+    # ending up on the file list.
+    down=$(panned 3008 2000 "$SUMMIT_Y" "$SUMMIT_NOTCHES")
+    sweep=$(swept 3008 2000 "$SUMMIT_X" "$SUMMIT_NOTCHES")
+    set -- $(window geometry)
+    edge=$(($1 + $3 - 40))
+    reach=$((edge - (sweep - (edge - px))))
+    [ "$reach" -lt $(($1 + 30 + LIST + 40)) ] && reach=$(($1 + 30 + LIST + 40))
+
+    note key wheel
+    # Three turns of the wheel and the three strokes that follow them on one
+    # device. A `wheel` and a `drag` of their own would be a device each, and
+    # half a second of the picture sitting still while each is made and taken
+    # away; queued, the zoom runs on into the pan as one movement of the hand.
+    #
+    # The strokes are the other half of what the pointer is for: the wheel
+    # puts the summit under it, and the hand on the picture brings first the
+    # sky over the summit and then the tree at the picture's far edge into
+    # the frame. A drag pans by the negative of itself, so down is what
+    # brings the top down into view and right is what brings the left edge
+    # across, and the pan stops at the picture's edge whatever is asked of
+    # it — which is what the reach back between the two strokes relies on.
+    gesture wheel 2 -- rest 0.12 -- wheel 2 -- rest 0.12 -- wheel 2 \
+        -- rest 0.45 -- drag 0 "$down" \
+        -- rest 0.3 -- drag $((edge - px)) 0 \
+        -- rest 0.2 -- glide "$reach" $((py + down)) \
+        -- rest 0.2 -- drag $((edge - reach)) 0
+    pause 1.2
+    note key Space
+    keys space
+    settle
+    pause 1.2
+}
+
+# The bird, and the loupe on its eye. The loupe comes up under the pointer,
+# so the pointer is on the bird before the key; Shift+L is CycleMagnification
+# and goes through four, from the 4x the last run left in the state file,
+# so two presses is 16x. Through the device's keyboard, since wtype's
+# capital reaches the window as `l` and would take the loupe down.
+beat_bird() {
+    note key ']'
+    keys bracketright
+    stepped
+    glide $(fitted 3032 2024 "$BREAST_X" "$BREAST_Y" "$LIST")
+    pause 0.5
+    note key l
+    keys l
+    pause 0.8
+    glide $(fitted 3032 2024 "$EYE_X" "$EYE_Y" "$LIST")
+    pause 1.2
+    note key 'Shift+L'
+    keyboard
+    # Once round the eye in three quarters of a second, the magnification
+    # stepping up twice on the way: the loupe rides with the pointer, and
+    # a hand that keeps moving through the change shows that it tracks and
+    # that it magnifies in one movement. Fifteen glides, each the device's
+    # own smallest move and the frames it waits for the window to have
+    # drawn it, is what comes to that long.
+    gesture $(circling $(fitted 3032 2024 "$EYE_X" "$EYE_Y" "$LIST") \
+        "$EYE_CIRCLE" 15)
+    pause 2
+    note key l
+    keys l
+    pause 0.4
+}
+
+# The chooser, and the raw frame with the sun in it. Ctrl+P is matched on
+# the key's position, which is the device's keyboard rather than wtype's.
+beat_chooser() {
+    note key 'Ctrl+P'
+    press ctrl+p
+    pause 1
+    note key 'sun  Enter'
+    PACE=0.18
+    keys s u n
+    unset PACE
+    pause 0.8
+    keys Return
+    stepped
+    pause 0.5
+}
+
+# The histogram, and the marks on the pixels the sun has taken to white,
+# both from their own buttons: the panel is what this beat is about, and a
+# button pressed says where the thing lives in a way a key never can. The
+# toggle is the first of the right strip, a bar's padding under the top
+# bar; the marks button is the one beside the band at the foot of the
+# panel's own strip, a panel's inset in from its left edge and centered on
+# the band — the same two the README's `histogram` film presses.
+#
+# Then the pointer comes off the panel, for two reasons: the button it was
+# on would raise its tooltip over the very marks it just painted, and the
+# readout in the bottom bar is of whatever pixel the pointer is over, which
+# down on the water is one the display has taken to white. Everything after
+# this is keys, pressed from there.
+#
+# No captions over the two presses. The pointer is on screen doing them,
+# and a button under it says more than a word would.
+beat_clipping() {
+    set -- $(window geometry)
+    gesture glide $(($1 + $3 - 15)) $(($2 + 45)) -- rest 0.5 -- click \
+        -- rest 1.2 \
+        -- glide $(($1 + $3 - 329)) $(($2 + 195)) -- rest 0.5 -- click \
+        -- rest 1.0 \
+        -- glide $(fitted 3032 2024 "$GLINT_X" "$GLINT_Y" "$LIST")
+    pause 2.2
+}
+
+# The marks off, and the file thrown away from the menu of the file — the
+# button before its name in the top bar, and the sixth of the seven items
+# that hang under it, 26 apart. By the menu rather than by Del because the
+# menu is where a reader who has never pressed Del would find it, and
+# because it puts the file's own name over the item that throws it away.
+#
+# `w` has to go before it: the marks are the application's setting rather
+# than the file's, so they survive the step onto the next picture, and the
+# relief would arrive wearing them. Deleting trashes the link and steps
+# forward, which lands on the relief and leaves the three rasters standing
+# next to each other; the toast says what went and what undoes it.
+beat_delete() {
+    note key w
+    keys w
+    pause 1
+    set -- $(window geometry)
+    gesture glide $(($1 + 136)) $(($2 + 14)) -- rest 0.5 -- click \
+        -- rest 1.0 \
+        -- glide $(($1 + 180)) $(($2 + 214)) -- rest 0.6 -- click
+    stepped
+    pause 2.6
+}
+
+# The histogram away — it has to be, or the information panel would be
+# stacked under it and come out shorter than the punch is cut for — and the
+# wheel into the crater. Four notches from a fit of 38% is about 92%.
+beat_crater() {
+    note key h
+    keys h
+    pause 0.5
+    glide $(fitted 4400 3760 "$CRATER_X" "$CRATER_Y" "$LIST")
+    pause 0.4
+    note key wheel
+    wheel 4 1.0
+    pause 1.5
+}
+
+# Back up the chain the relief was made down: hillshade, then the elevation
+# itself. The three are of a size, so each arrives where the last was left
+# and the crater does not move.
+#
+# Picked off the file list rather than stepped into with `[`. The list has
+# been down the side of the window since the first beat and has just had a
+# row taken out of it on camera; this is where it earns that room, and the
+# thumbnails say what is being gone back to before it arrives — which two
+# presses of a bracket cannot. The pointer goes back to the crater
+# afterwards: the wheel zoomed about that point and so left it under the
+# pointer, no hover tooltip comes up over the picture there, and the
+# readout in the bottom bar is of the elevation the next beat colors.
+beat_chain() {
+    set -- $(window geometry)
+    gesture glide $(($1 + 76)) $(($2 + $(row 4))) -- rest 0.4 -- click
+    stepped
+    pause 1.4
+    gesture glide $(($1 + 76)) $(($2 + $(row 3))) -- rest 0.4 -- click
+    stepped
+    pause 1.0
+    glide $(fitted 4400 3760 "$CRATER_X" "$CRATER_Y" "$LIST")
+    pause 0.8
+}
+
+# False color on the elevation, where it means the most, and the panel that
+# says where on the mountain this is. The colormap is the file's own
+# setting and does not follow a step, so `r` is pressed on the picture it
+# is for.
+beat_panel() {
+    note key r
+    keys r
+    pause 1.8
+
+    # The punch, in the master's pixels, worked out from the window rather than
+    # written down: the panel is PANEL_WIDTH wide and as tall as the content area
+    # less its padding, anchored to the content's top right, and the crop is
+    # anchored to the window's right edge so that no background creeps into it and
+    # centered on the panel, which is what the 36 pixels either side come to.
+    punch=$(set -- $(window geometry) $(output master); awk \
+        -v wx="$1" -v wy="$2" -v ww="$3" -v wh="$4" -v mw="$5" -v mh="$6" \
+        -v mx="$MX" -v my="$MY" -v s="$(scale)" -v punch="$PUNCH" 'BEGIN {
+            bar = 30; pad = 12; panel = 308
+            top = (wy - my + bar + pad) * s
+            high = (wh - 2 * bar - 2 * pad) * s
+            right = (wx - mx + ww) * s
+            cw = int(mw / punch); ch = int(mh / punch)
+            cx = right - cw; cy = top - (ch - high) / 2
+            if (cx < 0) cx = 0; if (cx + cw > mw) cx = mw - cw
+            if (cy < 0) cy = 0; if (cy + ch > mh) cy = mh - ch
+            printf "%d:%d:%d:%d\n", cw, ch, cx, cy
+        }')
+
+    note key i
+    note crop "$punch"
+    keys i
+    pause 4
+}
+
+# Out to the whole desk again for the theme, which is the argument: the
+#  window is not themed, the desk is, and the window follows. Back on the
+#  theme it opened on, so that the film loops wide to wide on one palette.
+beat_theme() {
+    note crop wide
+    pause 0.3
+    swap "theme menu" $(letters "$AWAY")
+    swap "theme menu" $(letters "$WAS_THEME")
+    pause 2.5
+}
+
+REHEARSING=yes
+rehearsed=no
+for beat in $BEATS; do
+    case " $filmed " in
+        *" $beat "*)
+            # The first beat asked for is where the recorder comes on.
+            if [ "$REHEARSING" = yes ]; then
+                REHEARSING=no
+                if [ "$FILM" = yes ]; then
+                    FRAME=$(output frame)
+                    rm -f "$EDL"
+                    resting_x=${CURSOR_X:-}
+                    resting_y=${CURSOR_Y:-}
+                    record "showcase.mp4" cursor
+                    # `record` parks the pointer on the top bar before it
+                    # starts, which after a rehearsal would throw away
+                    # wherever the beats before this one left it — over the
+                    # crater, over the sun. Put it back, at the cost of the
+                    # first moment of a part-film having it arrive.
+                    if [ "$rehearsed" = yes ] && [ -n "$resting_x" ]; then
+                        cursor "$resting_x" "$resting_y"
+                        sleep 0.4
+                    fi
+                    note master "$(output master | tr ' ' x)"
+                    note crop wide
+                fi
+            fi
+            ;;
+        *) rehearsed=yes ;;
+    esac
+    "beat_$beat"
+    [ "$beat" = "$last" ] && break
+done
+
+note end -
+film=
+[ "$FILM" = yes ] && film=$(cut)
+close
+
+# The film cut by the list beside it: one pass, each segment trimmed and
+# cropped on its own and the segments concatenated, so that all of them leave
+# the filter graph at one size and with one set of parameters. `flags=area` is
+# a box average, which is the right supersample at these ratios and will not
+# ring on a one-pixel border or on text the way lanczos can. The captions go
+# on after the concatenation, so they stand in the same place whether the
+# frame under them is the whole desk or the punch.
+deliver() {
+    graph=$FILMS/showcase.filter
+    awk -v ramp="$RAMP" '
+        # Counted from zero explicitly: a counter that has never been
+        # assigned is the empty string, and the first line would go in at
+        # that subscript rather than at nought.
+        BEGIN { cuts = 0; pressed = 0 }
+        $1 == "crop" { at[cuts] = $2; spec[cuts] = $3; cuts++ }
+        # Everything after the time is the caption, spaces and all: "sun
+        # Enter" is one thing pressed, not two.
+        $1 == "key" {
+            at_key[pressed] = $2
+            text = $0
+            sub(/^key[ \t]+[^ \t]+[ \t]+/, "", text)
+            caption[pressed] = text
+            pressed++
+        }
+        $1 == "end"  { finish = $2 }
+        $1 == "master" { split($3, whole, "x"); mw = whole[1]; mh = whole[2] }
+        END {
+            # drawtext wants its text in quotes of its own, which are awkward
+            # to write inside a program the shell is holding in quotes: this
+            # is one, by its character code.
+            quote = sprintf("%c", 39)
+            # Without it the punch would quietly come out as no punch at all,
+            # the zoom being worked out from it.
+            if (mw == "") {
+                print "deliver: the edit list says no master size" > "/dev/stderr"
+                exit 1
+            }
+            for (i = 0; i < cuts; i++) {
+                start = i == 0 ? 0 : at[i]
+                stop = i + 1 < cuts ? at[i + 1] : finish
+                split(spec[i], box, ":")
+                zoom = spec[i] == "wide" ? 1 : mw / box[1]
+                printf "[0:v]trim=%s:%s,setpts=PTS-STARTPTS", start, stop
+                if (zoom <= 1.01) {
+                    printf ",scale=1920:1080:flags=area"
+                } else {
+                    # A push in, a hold, and a pull out, in one filter.
+                    #
+                    # crop cannot do it: its width and height are worked out
+                    # once, and a zoom is a width that changes every frame.
+                    # zoompan can, and it is handed the master at its own size
+                    # rather than at the delivery size, so that the held frame
+                    # carries every pixel a cut straight to the crop would have
+                    # shown and the movement costs nothing in sharpness. Its x
+                    # and y are where the window starts in the frame as it
+                    # arrived rather than in the frame it has scaled up, so the
+                    # zoom does not go into them a second time.
+                    steps = int(ramp * 60)
+                    frames = int((stop - start) * 60)
+                    printf ",zoompan=z=%c1+%.6f*min(min(on/%d\\,1)\\,max(0\\,(%d-on)/%d))%c", \
+                        39, zoom - 1, steps, frames, steps, 39
+                    printf ":x=%c%.4f*(zoom-1)%c", 39, box[3] / (zoom - 1), 39
+                    printf ":y=%c%.4f*(zoom-1)%c", 39, box[4] / (zoom - 1), 39
+                    printf ":d=1:s=%dx%d:fps=60", mw, mh
+                    printf ",scale=1920:1080:flags=area"
+                }
+                printf "[s%d];\n", i
+                chain = chain sprintf("[s%d]", i)
+            }
+            printf "%sconcat=n=%d:v=1:a=0[cut];\n", chain, cuts
+            printf "[cut]"
+            for (i = 0; i < pressed; i++) {
+                # A caption stands for a second and a bit, or until the next
+                # one wants the same corner, whichever comes first.
+                gone = at_key[i] + 1.3
+                if (i + 1 < pressed && at_key[i + 1] < gone) gone = at_key[i + 1]
+                printf "%sdrawtext=font=monospace", i ? "," : ""
+                printf ":text=%s%s%s", quote, caption[i], quote
+                printf ":fontsize=46:fontcolor=white@0.95"
+                printf ":box=1:boxcolor=black@0.5:boxborderw=20"
+                printf ":x=(w-tw)/2:y=h-th-72"
+                printf ":enable=%sbetween(t,%s,%s)%s", quote, at_key[i], gone, quote
+            }
+            printf "[out]\n"
+        }' "$2" > "$graph"
+    ffmpeg -v error -y -i "$1" -filter_complex "$(cat "$graph")" -map "[out]" \
+        -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart \
+        -an "$SCREENSHOTS/$3"
+    echo "$SCREENSHOTS/$3"
+}
+
+# Only a whole film is worth cutting: a run of a beat or two is for watching
+# the beat, and the captions and the punch are the whole film's arithmetic.
+if [ "$whole" = yes ] && [ "$FILM" = yes ]; then
+    deliver "$film" "$EDL" "showcase.mp4"
+elif [ -n "$film" ]; then
+    echo "$film"
+fi

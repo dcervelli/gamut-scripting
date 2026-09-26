@@ -110,7 +110,10 @@ UNIT = 0.25
 # spread evenly, which makes the first and last steps about a third of
 # PACE and the middle ones a third more. At 0 every step would be PACE;
 # at 1 the first and last would be nothing.
-PACE = 16
+# POINTER_PACE in the environment raises or lowers it for a run: a film of
+# the whole desk crosses a 1400-pixel window rather than a 1000-pixel one,
+# and a hand does not take twice as long to do it.
+PACE = int(os.environ.get("POINTER_PACE", 16))
 EASE = 0.7
 
 # The least a key press waits before the next, and the most: a hand does

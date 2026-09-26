@@ -27,6 +27,10 @@
 #   GAMUT         the binary to drive        ~/git/gamut/target/release/gamut
 #   SCREENSHOTS   where the pictures go      screenshots/ beside this file
 #   FILMS         where the recordings go    films/ beside this file, ignored by git
+#   CODEC         what `record` encodes in   h264
+#   QUALITY       what it encodes at         the recorder's own default
+#   POINTER_PACE  logical pixels a frame     16
+#                 the pointer moves at
 #
 # The window opens on whatever workspace is active, so the script is for a
 # desk someone is sitting at, not for CI. Keep your hands off the keyboard
@@ -475,7 +479,14 @@ record() {
     mkdir -p "$FILMS"
     rm -f "$1" "$1.ts"
     case $2 in cursor) shown=yes ;; *) shown=no ;; esac
-    gpu-screen-recorder -w "${5}x$6+$3+$4" -f 60 -fm cfr -k h264 -cursor "$shown" \
+    # h264 at the recorder's own quality is right for a film of one window,
+    # which is a fraction of a 4K frame. A film of a whole monitor is the
+    # whole frame, where both show: CODEC and QUALITY are what the showcase
+    # raises them to.
+    quality=
+    [ -z "${QUALITY:-}" ] || quality="-q $QUALITY"
+    gpu-screen-recorder -w "${5}x$6+$3+$4" -f 60 -fm cfr -k "${CODEC:-h264}" $quality \
+        -cursor "$shown" \
         -fallback-cpu-encoding yes -write-first-frame-ts yes -o "$1" 2>"$1.log" &
     RECORDER=$!
     RECORDING=$1
