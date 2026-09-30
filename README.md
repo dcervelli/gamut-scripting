@@ -15,7 +15,7 @@ is what changes the picture there.
 | `pixel_grid` | the grid on, the wheel rolled over the stag until the grid is at single pixels, then Space |
 | `pixel_copy` | the grid on and the wheel rolled into the mountain, the dot at the head of the readout hovered and pressed, Hex chosen, and Ctrl+. over the picture |
 | `open_in` | the photograph with the open button in the left strip pressed and the "Open in…" menu of what this desk will open it in standing beside it |
-| `info` | an elevation model in turbo with the information panel up, at 50% |
+| `info` | a spatial photo with the information panel opened by `i`, read the way it is meant to be: the column scrolled to its foot, where the regions the metadata marks out are listed, and the Focus region's row hovered so that its box is drawn on the picture; back at the head, `Shift+D` putting the depth map up in the picture's place and taking it down, which moves the Showing pill to the depth map's own section; then the Raw Data tab, filtered to the six tags that say "gain", and those copied as JSON |
 | `compare` | the three rasters of one mountain flipped through, the wheel rolled into the crater on the way |
 | `false_color` | the hillshade held over the crater, `r` pressed through the four color maps |
 | `fuzzy_finder` | the chooser over a directory of several hundred pictures, opened from the counter at the head of the top bar and one picture chosen by a few letters, then opened again with Ctrl+P and one asked for by its number, typed slowly |
@@ -50,7 +50,8 @@ Five things are the environment's to say, each with a default:
 The pictures they open are in `images/`: seven of one mountain in
 `images/mora` — a photograph, two raw frames, an aerial and the three
 12.5 m rasters of the same ground — several hundred bird plates in
-`images/birds`, and the GIF and the stag beside them. Each script takes
+`images/birds`, two spatial photos that carry a depth map in
+`images/depth`, and the GIF and the stag beside them. Each script takes
 another path as its first argument. `mandelbrot` opens no picture of ours:
 the program that draws its picture is the Rust crate in
 [`mandelbrot-zoom/`](mandelbrot-zoom/), which the script builds if `cargo

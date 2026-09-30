@@ -1,14 +1,118 @@
 #!/bin/sh
-# The README's information panel: an elevation model in a 1000x600 window,
-# in turbo false color, with the panel open and the picture at 50%.
+# The README's metadata: a spatial photo in a 1000x600 window, the
+# information panel opened with `i` and then read the way it is meant to be
+# read. The column is scrolled to its foot, where the regions the metadata
+# marks out are listed, and the Focus region's row is hovered, which draws
+# its box on the picture with its name over it; back at the head, Shift+D
+# puts the depth map up in the picture's place and takes it down again,
+# which moves the Showing pill from the Image section to the Depth map one
+# and back; then the Raw Data tab, where every tag exiftool reads is,
+# filtered to the six that say "gain", and those copied as JSON from the
+# menu at the head of the tab.
 #
-#   ./info            on images/mora/mora_dem_12.5m_utm10.tif
+# One file carries the lot, which is why it is this one: a phone's photo
+# has the camera, the exposure and the regions, a spatial photo adds the
+# depth map, and Apple's HDR adds the gain map the filter finds. The
+# pointer is in the film, since half of what the panel does is done by
+# pointing at it, and it moves as a hand would, through device.py.
+#
+#   ./info            on images/depth/spatial_depth.heic
 #   ./info FILE       on another file
 
 . "$(dirname "$0")/lib.sh"
 
-open 1000 600 --colormap turbo --info "${1:-$ROOT/images/mora/mora_dem_12.5m_utm10.tif}"
-press shift+2
-settle
-shoot "info.jpg"
+file=${1:-$ROOT/images/depth/spatial_depth.heic}
+
+open 1000 600 "$file"
+keep_pointer
+
+record "info.mp4" cursor
+started=$(since_record)
+sleep 0.5
+keys i
+# Long enough at the head of the column to read what the file is and what
+# the picture is before the pointer arrives.
+sleep 1.5
+
+set -- $(window geometry)
+# The panel stands at the top right of the content area: PANEL_WIDTH wide,
+# a padding in from the bars, so what is on it runs from 340 to 52 in from
+# the window's right edge, and its header sits 62 down whatever the window
+# is. Across the column is where the wheel turns it; the two ends of the
+# header are the tabs and the button that copies the tab on screen.
+column_x=$(($1 + $3 - 200))
+head_y=$(($2 + 62))
+tab_x=$(($1 + $3 - 255))
+copy_x=$(($1 + $3 - 84))
+field_x=$(($1 + $3 - 196))
+field_y=$(($2 + 98))
+# The menu of forms hangs under the copy button, aligned with its right
+# end, so a straight run down from the button passes through every item:
+# Plaintext, CSV, JSON, XML, 26 apart from the first at 98.
+json_y=$(($2 + 151))
+# The last row of the last section while the column is at its foot: the
+# panel ends a padding above the bottom bar, and the row is half a line up
+# from there.
+focus_y=$(($2 + $4 - 60))
+
+# The wheel turns the column only with the pointer over it. Nine notches
+# is half as many again as the column has to give on this file, so it ends
+# at the foot however much the panel gains, and it is turned over a second
+# rather than flicked, since what goes past is meant to be read.
+glide "$column_x" $(($2 + 300))
+sleep 0.4
+wheel -9 1.2
+sleep 0.5
+
+# The Focus row, held long enough for the dashed box on the picture and
+# the name over it to be seen as the row's own.
+glide "$column_x" "$focus_y"
+sleep 1.6
+# Off the regions before the column moves: rows light as they pass under
+# the pointer, and a region's row would flash its box on the picture with
+# every one.
+glide "$column_x" $(($2 + 300))
+sleep 0.4
+wheel 9 1.2
+sleep 0.5
+
+# Shift+D goes through the device's keyboard, since wtype's capital
+# reaches the window as `d`, which is not a binding at all. The depth map
+# stands in the picture's place for as long as it takes to see that the
+# top bar and the Showing pill have both followed it there.
+press shift+d
+sleep 0.75
+press shift+d
+sleep 1.0
+
+# The Raw Data tab, which is exiftool's; a moment for it to answer.
+glide "$tab_x" "$head_y"
+sleep 0.4
+click
+sleep 1.5
+
+# The field is not given the keyboard when the tab comes up — a field
+# holding it would take every key the window answers — so it is clicked
+# before it is typed into, and the letters come slowly enough that the
+# count under them can be read falling with each one.
+glide "$field_x" "$field_y"
+sleep 0.3
+click
+sleep 0.4
+PACE=0.15
+keys g a i n
+unset PACE
+sleep 1.2
+
+glide "$copy_x" "$head_y"
+sleep 0.4
+click
+sleep 0.8
+glide "$copy_x" "$json_y"
+sleep 0.4
+click
+# Long enough for the toast that says how many tags went, and as what.
+sleep 1.6
+film=$(cut)
 close
+gif "$film" "info.gif" 800 "$started"
