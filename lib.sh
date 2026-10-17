@@ -17,10 +17,12 @@
 #   close
 #
 # or, for a recording, `record x.mp4` and `cut` around the keys, and
-# `gif "$film" x.gif` afterwards. The recording is gpu-screen-recorder's,
-# into $FILMS, and the GIF is ffmpeg's, into $SCREENSHOTS. A GIF that
-# flips between stills is `still a.png`, `still b.png`, and
-# `flipbook x.gif 2 "$a" "$b"`.
+# `clip "$film" x.mp4` afterwards, and `poster "$clip" x.jpg 9` for a still
+# to stand in for it. The recording is gpu-screen-recorder's, into $FILMS,
+# and the cut is ffmpeg's, into $SCREENSHOTS. `gif` puts the same cut out
+# as a GIF instead, which is what the scripts not yet moved over to MP4
+# still call. A GIF that flips between stills is
+# `still a.png`, `still b.png`, and `flipbook x.gif 2 "$a" "$b"`.
 #
 # Three things are the environment's to say, each with a default:
 #
@@ -586,6 +588,43 @@ gif() {
     ffmpeg -v error -y $window -i "$film" \
         -filter_complex "$filters,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
         -loop 0 "$out"
+    echo "$out"
+}
+
+# The recording, or the part of it from START for LENGTH seconds, as an MP4
+# under the name given in $SCREENSHOTS, at the film's own size and frame
+# rate: 1920x1080 at 60, for a window opened 1200x675 on a monitor at scale
+# 1.6. The encode is the showcase's, so that every film the repo delivers
+# is the same one. The cut cannot be a stream copy, which could only begin
+# at a keyframe.
+#
+#   clip "$film" out.mp4 [START] [LENGTH]
+clip() {
+    film=$1
+    out=$SCREENSHOTS/$2
+    window=""
+    [ -n "${3:-}" ] && window="-ss $3"
+    [ -n "${4:-}" ] && window="$window -t $4"
+    ffmpeg -v error -y $window -i "$film" \
+        -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p \
+        -movflags +faststart -an "$out"
+    echo "$out"
+}
+
+# One frame of a clip, AT seconds into it, as a JPEG under the name given in
+# $SCREENSHOTS, at the clip's own size and the quality `shoot` writes: the
+# still that stands in for a film wherever a video cannot be played. AT is
+# in the clip's own time, not the recording's, so it is read off the
+# delivered file rather than the master in $FILMS.
+#
+#   poster "$clip" out.jpg 9
+poster() {
+    out=$SCREENSHOTS/$2
+    frame=$FILMS/${2%.*}.poster.png
+    mkdir -p "$FILMS"
+    ffmpeg -v error -y -ss "$3" -i "$1" -frames:v 1 "$frame"
+    magick "$frame" -quality 92 "$out"
+    rm -f "$frame"
     echo "$out"
 }
 

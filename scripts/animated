@@ -1,20 +1,33 @@
 #!/bin/sh
-# The README's animation: a GIF in a 1000x600 window, opened stopped on its
-# first frame, then played through once with the transport bar under it.
-# The film is cut to one loop of the file from the moment play was pressed,
-# so the GIF made from it loops where the file does.
+# The README's animation: an animated WebP in a 1200x675 window (16:9)
+# with the histogram beside it, opened stopped on its first frame, then
+# played through once with the transport bar under it. The film is cut to
+# one loop of the file from the moment play was pressed, so the clip loops
+# where the file does, and one frame of it is kept as a still.
 #
-#   scripts/animated                  on images/stellated-dodecahedron.gif
+# The file is 1358x764, which is the rectangle the picture is left once the
+# histogram has taken its width: it plays at 100%, a device pixel each,
+# rather than being blown up to fit. Open the panel and the picture's
+# rectangle narrows, so a file cut to the window without it would be
+# resampled.
+#
+#   scripts/animated                  on images/descent.webp
 #   scripts/animated FILE             on another animation
 
 . "$(dirname "$0")/../lib.sh"
 
-file=${1:-$ROOT/images/stellated-dodecahedron.gif}
+file=${1:-$ROOT/images/descent.webp}
 
-# One loop, in seconds: the frame delays are in hundredths.
-loop=$(magick identify -format '%T\n' "$file" | awk '{ s += $1 } END { print s / 100 }')
+# One loop, in seconds, from the file's own frame durations. ffprobe rather
+# than `magick identify -format %T`, whose delay is in whole hundredths: it
+# reads this WebP's 83.33 ms frame as 80 and so stops the film half a second
+# short of the loop over the hundred and forty of them. The two agree on a
+# GIF, whose delays are hundredths to begin with.
+loop=$(ffprobe -v error -select_streams v -of csv=p=0 \
+    -show_entries frame=duration_time "$file" |
+    awk '{ s += $1 } END { printf "%.3f\n", s }')
 
-open 1000 600 --paused "$file"
+open 1200 675 --histogram --paused "$file"
 record "animated.mp4"
 started=$(since_record)
 keys Return
@@ -22,4 +35,8 @@ sleep "$loop"
 settle
 film=$(cut)
 close
-gif "$film" "animated.gif" 800 "$started" "$loop"
+shown=$(clip "$film" "animated.mp4" "$started" "$loop")
+echo "$shown"
+# The still that stands in for the film: three quarters through the
+# loop, where the valley is open and the histogram has moved with it.
+poster "$shown" "animated_thumb.jpg" 9
