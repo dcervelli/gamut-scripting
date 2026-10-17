@@ -31,6 +31,8 @@
 #   QUALITY       what it encodes at         the recorder's own default
 #   POINTER_PACE  logical pixels a frame     16
 #                 the pointer moves at
+#   BELL          whether `open` rings the   yes
+#                 bell to clear the desk
 #
 # The window opens on whatever workspace is active, so the script is for a
 # desk someone is sitting at, not for CI. Keep your hands off the keyboard
@@ -87,11 +89,35 @@ window() {
         esac)"
 }
 
+# Two rings of the system bell and a second's grace, for the desk this runs
+# on: the keys a script sends go to whichever window has the keyboard, so
+# anything typed while one runs lands in the picture. The warning comes
+# before the window does, at the top of `open`, because the keys are sent
+# long before the shutter — a bell at `shoot` would ring too late to save
+# the shot. It rings once a run, and not at all under BELL=no.
+#
+# The sound is the desktop's own `bell`, through libcanberra; where that is
+# not installed the terminal's bell stands in, which a terminal is free to
+# show rather than sound. Neither is worth failing a run over.
+handsoff() {
+    [ -z "${WARNED:-}" ] || return 0
+    WARNED=yes
+    case "${BELL:-yes}" in no|NO|0) return 0 ;; esac
+    if command -v canberra-gtk-play >/dev/null; then
+        canberra-gtk-play -i bell >/dev/null 2>&1 || true
+        canberra-gtk-play -i bell >/dev/null 2>&1 || true
+    else
+        printf '\a\a' >&2
+    fi
+    sleep 1
+}
+
 # Open gamut at W by H logical pixels on the rest of the arguments, floating
 # and centered so that the layout neither tiles nor resizes it, at full
 # opacity so that whatever is behind it stays out of the picture. Returns
 # once the first file is on screen and the window has the keyboard.
 open() {
+    handsoff
     width=$1
     height=$2
     shift 2
@@ -178,6 +204,33 @@ frame() {
 #   environment XDG_PICTURES_DIR "$FILMS/pasted"
 environment() {
     ENVIRONMENT="${ENVIRONMENT:-} $1=$(shell_quote "$2")"
+}
+
+# Sort the file list by SORT, one of `name`, `path`, `type`, `date`,
+# `size`, `width`, `height` or `area`, in DIRECTION, `ascending` or
+# `descending`. For before `open`: the program keeps the order its menu
+# was last left in, in $XDG_STATE_HOME/gamut/state, and writes the file
+# back when its window closes, so a script that wants a known file first
+# has to say so rather than trust whatever the last run left.
+#
+#   sort_by name ascending     mora.jpg at the top of images/mora
+#
+# The state file is the user's own, and is left set to what was asked for
+# here; the program's own defaults are `name ascending` already, so a run
+# with no state file at all is the same as this.
+sort_by() {
+    state="${XDG_STATE_HOME:-$HOME/.local/state}/gamut/state"
+    mkdir -p "$(dirname "$state")"
+    [ -e "$state" ] || : > "$state"
+    awk -v sort="$1" -v direction="$2" '
+        /^sort = / { print "sort = " sort; sorted = 1; next }
+        /^sort_direction = / { print "sort_direction = " direction; directed = 1; next }
+        { print }
+        END {
+            if (!sorted) print "sort = " sort
+            if (!directed) print "sort_direction = " direction
+        }' "$state" >"$state.new"
+    mv "$state.new" "$state"
 }
 
 # Where on the focused monitor a W by H window goes, in logical pixels

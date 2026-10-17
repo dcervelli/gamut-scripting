@@ -1,15 +1,21 @@
 #!/bin/sh
-# The README's first picture: a photograph in a 1000x600 window, zoomed in
-# three steps and panned five steps up to the summit, with the minimap
-# showing where in the picture that is.
+# The README's first picture: a photograph in a 1200x675 window (16:9),
+# zoomed in three steps and panned five steps up to the summit, with the
+# minimap showing where in the picture that is.
+#
+# The file list is sorted by name so that mora.jpg is the one on screen:
+# the order is the program's to remember between runs, not this script's
+# to assume. The arrows alone step through the files, so the pan is the
+# shifted ones.
 #
 #   ./main_screenshot            on images/mora
 #   ./main_screenshot DIR        on the images in DIR
 
 . "$(dirname "$0")/lib.sh"
 
-open 1000 600 "${1:-$ROOT/images/mora}"
-keys plus plus plus Up Up Up Up Up
+sort_by name ascending
+open 1200 675 "${1:-$ROOT/images/mora}"
+keys plus plus plus shift-Up shift-Up shift-Up shift-Up shift-Up
 settle
 shoot "main_screenshot.jpg"
 close
