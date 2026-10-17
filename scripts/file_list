@@ -13,8 +13,8 @@
 # pointer is in the film, since where it goes is the point, and it moves
 # as a hand would, through device.py.
 #
-#   ./file_list              on images/mora
-#   ./file_list DIR X Y      on another directory, the wheel over pixel
+#   scripts/file_list                    on images/mora
+#   scripts/file_list DIR X Y            on another directory, the wheel over pixel
 #                            X, Y of the largest picture in it
 #
 # Where the rows are is the one thing about the panel that is not fixed:
@@ -34,7 +34,7 @@
 # desk's collation, which sorts the punctuation in these names the other
 # way and would put a different file at the head of the list.
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 dir=${1:-$ROOT/images/mora}
 x=${2:-2340}

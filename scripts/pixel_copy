@@ -8,10 +8,10 @@
 # where it goes is the point, and it moves as a hand would, through
 # device.py.
 #
-#   ./pixel_copy            on images/mora/mora.jpg
-#   ./pixel_copy FILE X Y   on another picture, zooming into pixel X, Y
+#   scripts/pixel_copy                  on images/mora/mora.jpg
+#   scripts/pixel_copy FILE X Y         on another picture, zooming into pixel X, Y
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 file=${1:-$ROOT/images/mora/mora.jpg}
 x=${2:-1250}

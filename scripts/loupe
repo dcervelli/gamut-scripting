@@ -8,12 +8,12 @@
 # window as `l` and takes the loupe down. The pointer is in the film,
 # since the loupe sits beside it and the toggle is clicked.
 #
-#   ./loupe            on images/birds
-#   ./loupe DIR X Y [FX FY]
+#   scripts/loupe                  on images/birds
+#   scripts/loupe DIR X Y [FX FY]
 #                      on another directory, the loupe over pixel X, Y of its
 #                      first file, then taken to FX, FY
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 dir=${1:-$ROOT/images/birds}
 x=${2:-252}

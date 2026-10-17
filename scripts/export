@@ -32,11 +32,11 @@
 # would push the name to `-edited-2` and the film would show that, and left
 # behind it would be one more file in the directory the other pictures show.
 #
-#   ./export                   on images/mora
-#   ./export X Y FILE...       on other files, the box around pixel X, Y of
+#   scripts/export                         on images/mora
+#   scripts/export X Y FILE...             on other files, the box around pixel X, Y of
 #                              the last of them
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 # The summit: the highest pixel of the elevation model beside the relief,
 # and the middle of the box.

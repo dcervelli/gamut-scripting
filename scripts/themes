@@ -7,11 +7,11 @@
 # retints itself when it changes. The desk is put back on whatever theme it
 # was on, however the script ends.
 #
-#   ./themes                on images/mora/mora.jpg
-#   ./themes FILE           on another picture
-#   ./themes FILE A B       between themes A and B, named as `omarchy theme list` names them
+#   scripts/themes                      on images/mora/mora.jpg
+#   scripts/themes FILE                 on another picture
+#   scripts/themes FILE A B             between themes A and B, named as `omarchy theme list` names them
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 file=${1:-$ROOT/images/mora/mora.jpg}
 first=${2:-Tokyo Night}

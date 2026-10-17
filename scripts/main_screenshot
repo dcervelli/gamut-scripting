@@ -8,10 +8,10 @@
 # to assume. The arrows alone step through the files, so the pan is the
 # shifted ones.
 #
-#   ./main_screenshot            on images/mora
-#   ./main_screenshot DIR        on the images in DIR
+#   scripts/main_screenshot                  on images/mora
+#   scripts/main_screenshot DIR              on the images in DIR
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 sort_by name ascending
 open 1200 675 "${1:-$ROOT/images/mora}"

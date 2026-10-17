@@ -4,10 +4,10 @@
 # The film is cut to one loop of the file from the moment play was pressed,
 # so the GIF made from it loops where the file does.
 #
-#   ./animated            on images/stellated-dodecahedron.gif
-#   ./animated FILE       on another animation
+#   scripts/animated                  on images/stellated-dodecahedron.gif
+#   scripts/animated FILE             on another animation
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 file=${1:-$ROOT/images/stellated-dodecahedron.gif}
 

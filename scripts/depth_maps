@@ -1,0 +1,83 @@
+#!/bin/sh
+# The README's depth maps: a spatial photo in a 1000x600 window, the depth
+# toggle at the right end of the bottom bar clicked on with the pointer so
+# that the map stands in the picture's place, and then the readout at the
+# other end of the same bar told to say depths — the dot at its head opens
+# the menu of ways to write a pixel's value, and Depth is the last of the
+# four — and the pointer walked across the map, from the desk in the
+# foreground out to the garden beyond the window and back to the metal on
+# the desk, with the distance under it written in the bar as it goes.
+#
+# The two ends of the bottom bar are the whole of it: the toggle is how the
+# map is found, since it is drawn only for a file that carries one, and the
+# readout is what the map is for. The walk is the point of the film, and so
+# has the map up under it rather than the photograph.
+#
+#   scripts/depth_maps                  on images/depth/spatial_depth.heic
+#   scripts/depth_maps FILE             on another file carrying a depth map
+
+. "$(dirname "$0")/../lib.sh"
+
+file=${1:-$ROOT/images/depth/spatial_depth.heic}
+# The primary image's, which is what the window shows: a HEIC holds more
+# than one, and `identify` writes a line for each.
+set -- $(magick identify -format '%w %h\n' "$file" | head -1)
+W=$1
+H=$2
+
+open 1000 600 "$file"
+keep_pointer
+
+record "depth_maps.mp4" cursor
+started=$(since_record)
+sleep 0.5
+# The depth toggle is the second thing in from the right end of the bottom
+# bar, after the HDR switch: 4 + 42 + 12 pixels of padding, switch and gap
+# take the bar to its left edge, and 11 more to its middle.
+set -- $(window geometry)
+glide $(($1 + $3 - 69)) $(($2 + $4 - 15))
+# Long enough on the button for its tooltip to come up and be read.
+sleep 1.0
+click
+sleep 1.5
+# The dot at the head of the readout is the third button in from the left
+# end of the same bar, after the grid's toggle and the loupe's, neither of
+# which carries a reading here: 4 pixels of padding, two 22-wide buttons
+# with 8 between them, and 11 more to the dot's middle.
+dot_x=$(($1 + 75))
+dot_y=$(($2 + $4 - 15))
+glide "$dot_x" "$dot_y"
+sleep 1.0
+click
+sleep 1.0
+# The menu stands over the dot, its Pixel value row along the foot: four
+# 84-wide cells 6 apart, of which Hex's middle is 41 right of the dot's and
+# 40 up, so Depth's, the last, is three cells further right.
+glide $((dot_x + 41 + 3 * 90)) $((dot_y - 40))
+sleep 1.0
+click
+sleep 1.0
+# Across the map as a hand reading it would go: onto the desk in the near
+# corner, up to the garden through the window, which is as far as this
+# picture sees, and back down to the metal hexagon in the middle. One
+# gesture, so that the pointer sets off once and the readout is never
+# still for long; about a second from the menu to the last mark.
+#
+# The marks are the photograph's pixels, though what is on screen is the
+# map: the map is 768x576 to the photograph's 5712x4284, and both being
+# four by three they are fitted into the same rectangle, so a point of the
+# one is the same place on screen as the point of the other.
+gesture glide $(fitted "$W" "$H" 700 3800) \
+     -- glide $(fitted "$W" "$H" 5300 2300) \
+     -- glide $(fitted "$W" "$H" 2850 3000)
+# Long enough to read the last distance the walk left in the bar.
+sleep 1.5
+film=$(cut)
+# Back to hex, off the film: the readout's format is one of the few things
+# gamut keeps between runs, so a script that changes it and leaves it
+# changed would take every other film's readout with it — and would find
+# the map's own cell already lit the next time this one ran. `.` steps
+# through the four, and Depth is the last of them.
+keys period
+close
+gif "$film" "depth_maps.gif" 800 "$started"

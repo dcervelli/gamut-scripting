@@ -5,10 +5,10 @@
 # asked for by its number, typed slowly enough to be read. The pointer is
 # in the film for the press.
 #
-#   ./fuzzy_finder            on images/birds
-#   ./fuzzy_finder DIR        on another directory
+#   scripts/fuzzy_finder                  on images/birds
+#   scripts/fuzzy_finder DIR              on another directory
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 open 1000 600 "${1:-$ROOT/images/birds}"
 # The file list comes up down the left with a directory open; Tab puts it

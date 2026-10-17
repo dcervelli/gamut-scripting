@@ -11,10 +11,10 @@
 # The four are opened by name rather than as their directory, which holds
 # other pictures of the mountain that would join them in the count.
 #
-#   ./ui                on images/mora
-#   ./ui FILE...        on other files
+#   scripts/ui                      on images/mora
+#   scripts/ui FILE...              on other files
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 if [ $# -eq 0 ]; then
     set -- "$ROOT/images/mora/mora.jpg" \

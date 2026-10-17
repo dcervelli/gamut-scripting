@@ -13,9 +13,9 @@
 # frame, then let go once the recording is running, so that every take
 # starts on the whole set and zooms from there.
 #
-#   ./mandelbrot
+#   scripts/mandelbrot
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 MANDELBROT=${MANDELBROT:-$ROOT/mandelbrot-zoom/target/release/mandelbrot}
 

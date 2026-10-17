@@ -8,10 +8,10 @@
 # The three are opened by name rather than as their directory, which holds
 # other pictures of the mountain that would come between them in name order.
 #
-#   ./compare                        the three of images/mora
-#   ./compare X Y FILE FILE FILE     three others of one size, zooming into their pixel X, Y
+#   scripts/compare                              the three of images/mora
+#   scripts/compare X Y FILE FILE FILE           three others of one size, zooming into their pixel X, Y
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 x=${1:-2340}
 y=${2:-2260}

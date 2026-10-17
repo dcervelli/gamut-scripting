@@ -1,8 +1,8 @@
 # gamut-scripting
 
 The scripts that take [gamut](https://github.com/dcervelli/gamut)'s
-pictures, and the pictures themselves: one script per picture in
-`screenshots/`, so that a picture can be taken again after the interface
+pictures, and the pictures themselves: one script in `scripts/` per picture
+in `screenshots/`, so that a picture can be taken again after the interface
 changes and come out the same size, in the same place, showing the same
 thing. What each one shows is the script. gamut's README links to the
 pictures here rather than carrying them, so taking one again and pushing it
@@ -31,10 +31,10 @@ is what changes the picture there.
 | `showcase` | the whole desk rather than the one window, on an empty workspace at scale 2: six pictures of one mountain opened once and walked through — the summit under the wheel, the loupe on a bird's eye, the sun's clipped pixels painted and the frame thrown away, the crater held up the three rasters, the panel that says where on the mountain it is — and Omarchy's own theme menu retinting the desk and the window with it at the end |
 
 ```sh
-./main_screenshot                       # screenshots/main_screenshot.jpg
-GAMUT=~/build/gamut ./compare           # with another binary
-SCREENSHOTS=/tmp/shots ./false_color    # to another directory
-./all                                   # every one of them, in the order above
+scripts/main_screenshot                       # screenshots/main_screenshot.jpg
+GAMUT=~/build/gamut scripts/compare           # with another binary
+SCREENSHOTS=/tmp/shots scripts/false_color    # to another directory
+scripts/all                                   # every one of them, in the order above
 ```
 
 Five things are the environment's to say, each with a default:

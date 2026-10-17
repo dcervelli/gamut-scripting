@@ -11,10 +11,10 @@
 # off. The pointer is in the film, since where it goes is the point, and
 # it moves as a hand would, through device.py.
 #
-#   ./histogram            on images/mora/mora.jpg
-#   ./histogram FILE       on another picture
+#   scripts/histogram                  on images/mora/mora.jpg
+#   scripts/histogram FILE             on another picture
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 file=${1:-$ROOT/images/mora/mora.jpg}
 

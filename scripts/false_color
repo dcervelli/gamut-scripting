@@ -9,10 +9,10 @@
 # steps land on; alone, it also comes up without the file list, which is
 # shown only while there is more than one file.
 #
-#   ./false_color              on images/mora's hillshade
-#   ./false_color FILE X Y     on another file, zooming into its pixel X, Y
+#   scripts/false_color                    on images/mora's hillshade
+#   scripts/false_color FILE X Y           on another file, zooming into its pixel X, Y
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 file=${1:-$ROOT/images/mora/mora_hillshade_12.5m.tif}
 x=${2:-2340}

@@ -31,10 +31,10 @@
 # A paste is written where the desktop keeps pictures; this one goes under
 # $FILMS instead, and the directory is cleared before each take.
 #
-#   ./region                 on images/omarchy.png
-#   ./region FILE X Y W H    on another picture, tightened to that box of its pixels
+#   scripts/region                       on images/omarchy.png
+#   scripts/region FILE X Y W H          on another picture, tightened to that box of its pixels
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 command -v wl-paste >/dev/null || { echo "wl-paste is not installed" >&2; exit 1; }
 

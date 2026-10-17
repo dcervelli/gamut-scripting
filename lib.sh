@@ -40,7 +40,7 @@
 
 set -eu
 
-ROOT=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
 CLASS=com.dcervelli.gamut
 GAMUT=${GAMUT:-$HOME/git/gamut/target/release/gamut}
 SCREENSHOTS=${SCREENSHOTS:-$ROOT/screenshots}

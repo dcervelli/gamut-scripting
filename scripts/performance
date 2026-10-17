@@ -14,10 +14,10 @@
 # the shell, and so is placed by a rule set beforehand and taken away
 # after.
 #
-#   ./performance           on ~/Downloads/swiss-map-raster50_2007_285_krel_2.5_2056.tif
-#   ./performance FILE      on another
+#   scripts/performance                 on ~/Downloads/swiss-map-raster50_2007_285_krel_2.5_2056.tif
+#   scripts/performance FILE            on another
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 file=${1:-$HOME/Downloads/swiss-map-raster50_2007_285_krel_2.5_2056.tif}
 [ -r "$file" ] || { echo "no file at $file" >&2; exit 1; }

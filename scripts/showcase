@@ -48,14 +48,14 @@
 # way round the loop when what is being worked on is the cut rather than the
 # take.
 #
-#   ./showcase                    the whole film, cut, on HDMI-A-1, workspace 4
-#   ./showcase bird               that beat alone, recorded, left uncut
-#   FILM=no ./showcase bird       that beat alone, just watched
-#   ./showcase crater chain       from one to the other
-#   ./showcase post               the film already made, cut again
-#   MONITOR=DP-2 ./showcase       films the other monitor
-#   WORKSPACE=9 ./showcase        on another empty workspace
-#   AWAY='Rose Pine' ./showcase   swapping to another theme and back
+#   scripts/showcase                          the whole film, cut, on HDMI-A-1, workspace 4
+#   scripts/showcase bird                     that beat alone, recorded, left uncut
+#   FILM=no scripts/showcase bird             that beat alone, just watched
+#   scripts/showcase crater chain             from one to the other
+#   scripts/showcase post                     the film already made, cut again
+#   MONITOR=DP-2 scripts/showcase             films the other monitor
+#   WORKSPACE=9 scripts/showcase              on another empty workspace
+#   AWAY='Rose Pine' scripts/showcase         swapping to another theme and back
 #
 # The beats, in order:
 #
@@ -72,7 +72,7 @@
 #   theme      Omarchy's theme menu, the relief map opened under the new
 #              palette, and back to the theme the film opened on
 
-. "$(dirname "$0")/lib.sh"
+. "$(dirname "$0")/../lib.sh"
 
 MONITOR=${MONITOR:-HDMI-A-1}
 WORKSPACE=${WORKSPACE:-4}
