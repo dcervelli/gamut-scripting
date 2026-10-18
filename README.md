@@ -16,6 +16,7 @@ is what changes the picture there.
 | `pixel_copy` | the grid on and the wheel rolled into the mountain, the dot at the head of the readout hovered and pressed, Hex chosen, and Ctrl+. over the picture |
 | `open_in` | the photograph with the open button in the left strip pressed and the "Open in…" menu of what this desk will open it in standing beside it |
 | `info` | a spatial photo with the information panel opened by `i`, read the way it is meant to be: the column scrolled to its foot, where the regions the metadata marks out are listed, and the Focus region's row hovered so that its box is drawn on the picture; back at the head, `Shift+D` putting the depth map up in the picture's place and taking it down, which moves the Showing pill to the depth map's own section; then the Raw Data tab, filtered to the six tags that say "gain", and those copied as JSON |
+| `curated_info` | a phone's photo left a moment on its own, then the information toggle in the right strip clicked and the Curated tab wheeled down through its sections, File at the head to Regions at the foot |
 | `compare` | the three rasters of one mountain flipped through, the wheel rolled into the crater on the way |
 | `false_color` | the hillshade held over the crater, `r` pressed through the four color maps |
 | `fuzzy_finder` | the chooser over a directory of several hundred pictures, opened from the counter at the head of the top bar and one picture chosen by a few letters, then opened again with Ctrl+P and one asked for by its number, typed slowly |
@@ -43,7 +44,7 @@ Five things are the environment's to say, each with a default:
 | --- | --- | --- |
 | `GAMUT` | the binary to drive | `~/git/gamut/target/release/gamut` |
 | `SCREENSHOTS` | where the pictures go | `screenshots/` here |
-| `FILMS` | where the recordings go before they are GIFs | `films/` here, ignored by git |
+| `FILMS` | where the recordings go before they are cut | `films/` here, ignored by git |
 | `CODEC` | what `record` encodes in | `h264` |
 | `QUALITY` | what it encodes at | the recorder's own default |
 
@@ -248,15 +249,24 @@ runs, and where the rows are and where the picture is both follow from it.
 second, and waits for the `.ts` file it writes beside the film with its
 first frame's wall-clock time. That is the clock the film is cut by:
 `since_record` says how long after the first frame something was done, and
-`gif` takes a start and a length in those seconds. `animated` reads the
-start before it presses `Return` and the length from the file's own frame
-delays, so the GIF is one loop of the file from the moment play was
-pressed, and loops where the file does. `cut` stops the recorder with
+`clip` and `gif` take a start and a length in those seconds. `animated`
+reads the start before it presses `Return` and the length from the file's
+own frame durations, so the clip is one loop of the file from the moment
+play was pressed, and loops where the file does. It reads those durations
+with `ffprobe` rather than ImageMagick, whose delay is in whole hundredths
+and so reads an 83.33 ms WebP frame as 80. `cut` stops the recorder with
 `SIGINT`, which is how it is told to finish the file rather than drop it.
 
-`gif` is ffmpeg's two-pass GIF — a palette from the whole clip, then the
+`clip` is ffmpeg cutting the film and encoding it again, at the film's own
+1920×1080 and 60 frames a second: x264 at crf 18 with the index moved to
+the front, which is the encode `showcase` delivers. `poster` keeps one
+frame of that clip as a JPEG at the quality `shoot` writes, a still to
+stand in for the film wherever a video cannot be played; its time is in
+the clip's own, so `animated` asks for 9 s of its 12. `gif` is the older
+way out, ffmpeg's two-pass GIF — a palette from the whole clip, then the
 frames dithered against it, each frame only the rectangle that changed —
-at 25 frames a second and 800 pixels wide.
+at 25 frames a second and 800 pixels wide, and is what the scripts not yet
+moved over to MP4 still call.
 
 `mandelbrot` is a recording of the file under the window changing and the
 window following, first as it was opened and then under a pan and zoom of

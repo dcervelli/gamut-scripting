@@ -1,0 +1,52 @@
+#!/bin/sh
+# The information panel's Curated tab: a phone's photo in a 1200x675 window
+# (16:9), left a moment on its own, then the information toggle in the
+# right strip clicked with the pointer and the column wheeled down through
+# its sections at a reading pace, File at the head to whatever the file
+# carries at the foot.
+#
+# The pointer is in the film, since the panel is opened by pointing at its
+# button, and it moves as a hand would, through device.py.
+#
+#   scripts/curated_info                  on images/curated_info.heic
+#   scripts/curated_info FILE             on another file
+
+. "$(dirname "$0")/../lib.sh"
+
+file=${1:-$ROOT/images/curated_info.heic}
+
+open 1200 675 "$file"
+keep_pointer
+
+record "curated_info.mp4" cursor
+started=$(since_record)
+# The picture on its own before anything is pointed at.
+sleep 1.5
+
+set -- $(window geometry)
+# The information toggle is the second button of the right strip: centered
+# across the strip, under the histogram's at 45 by a button and a gap.
+glide $(($1 + $3 - 15)) $(($2 + 75))
+# Long enough on the button for its tooltip to come up and be read.
+sleep 1.5
+click
+# Long enough at the head of the column to read what the file is.
+sleep 1.5
+
+# The wheel turns the column only with the pointer over it: the panel's
+# middle is 200 in from the window's right edge. Turned slowly rather than
+# flicked, since what goes past is meant to be read. The column has about
+# five notches to give on this file, so six ends it at the foot.
+glide $(($1 + $3 - 200)) $(($2 + 300))
+sleep 0.4
+wheel -6 3
+# Long enough at the foot to read the last section.
+sleep 2.0
+film=$(cut)
+close
+shown=$(clip "$film" "curated_info.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: partway down the column, with
+# the camera, Exposure, Location and the camera drawn under Orientation on
+# the panel.
+poster "$shown" "curated_info_thumb.jpg" 9
