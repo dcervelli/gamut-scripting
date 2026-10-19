@@ -11,24 +11,23 @@ is what changes the picture there.
 | script | picture |
 | --- | --- |
 | `main_screenshot` | a photograph zoomed in three steps and panned to the summit, with the minimap |
-| `animated` | a GIF opened paused, then played through once with the transport bar |
+| `animated` | an animated WebP opened paused, with the histogram, then played through once with the transport bar |
 | `pixel_grid` | the grid on, the wheel rolled over the stag until the grid is at single pixels, then Space |
 | `pixel_copy` | the grid on and the wheel rolled into the mountain, the dot at the head of the readout hovered and pressed, Hex chosen, and Ctrl+. over the picture |
 | `open_in` | the photograph with the open button in the left strip pressed and the "Open in…" menu of what this desk will open it in standing beside it |
-| `info` | a spatial photo with the information panel opened by `i`, read the way it is meant to be: the column scrolled to its foot, where the regions the metadata marks out are listed, and the Focus region's row hovered so that its box is drawn on the picture; back at the head, `Shift+D` putting the depth map up in the picture's place and taking it down, which moves the Showing pill to the depth map's own section; then the Raw Data tab, filtered to the six tags that say "gain", and those copied as JSON |
 | `curated_info` | a phone's photo left a moment on its own, then the information toggle in the right strip clicked and the Curated tab wheeled down through its sections, File at the head to Regions at the foot |
 | `compare` | the three rasters of one mountain flipped through, the wheel rolled into the crater on the way |
-| `false_color` | the hillshade held over the crater, `r` pressed through the four color maps |
+| `false_color` | the hillshade held over the crater, the histogram opened from its button and the swatches under its Display band clicked through the four color maps, then the band's black handle dragged three tenths of the way in and its white one a tenth |
 | `fuzzy_finder` | the chooser over a directory of several hundred pictures, opened from the counter at the head of the top bar and one picture chosen by a few letters, then opened again with Ctrl+P and one asked for by its number, typed slowly |
 | `file_list` | the seven pictures of one mountain as their directory, the list down the left: the menu at its head opened and Area chosen, then Descending, which takes the strip to its foot, the wheel rolling it back to its head, and the first row clicked for the elevation model, the wheel turned over the crater, then the third for the shaded relief of the same ground, which comes up where the model was left |
-| `themes` | the photograph with the information panel open, on Tokyo Night, then on Gruvbox once the desk is switched to it, the two stills flipped between every two seconds |
-| `histogram` | the photograph with the histogram opened from its button, the black and white handles on the band each dragged a fifth of the way in, and the button beside the band pressed to paint the clipped pixels, then pressed again to take the paint off |
+| `themes` | the showcase's last beat on its own: the whole monitor on an empty workspace, the mountain's directory with the information panel open, Omarchy's theme menu taking the desk and the window to Lupine, Ctrl+P to the relief map under the new palette, and the menu back to the theme it started on |
+| `histogram` | the photograph with the histogram opened from its button, the black and white handles on the band each dragged a fifth of the way in, and the warning triangle at the head of the panel pressed to paint the clipped pixels, then pressed again to take the paint off |
+| `histogram_raw` | a Canon raw zoomed to 200% on the dragon's whisker, the histogram opened and wheeled down past Develop to Photosites, then the raw mosaic laid over the picture from the Photosites eye, the loupe turned on and taken along the whisker's edge, the wheel turned to about 400%, and Shift+M to take the mosaic off |
 | `ui` | the directory of the mountain's four rasters, the pointer held on the counter at the head of the top bar for its tooltip, the help button at the foot of the right strip pressed and the table of keys scrolled to its end over three seconds, Esc, and the button at the end of the top bar pressed to hide the interface |
 | `mandelbrot` | a PNG that a program rewrites every second, one step further into the Mandelbrot set, watched for ten seconds: zoomed four steps into the middle and panned once around it partway, then Space |
 | `region` | a web page's screenshot, `x` pressed and a box dragged out ten pixels loose around the wordmark, the wheel turned five notches in over the handle on its left edge, the handle clicked and Right pressed until the edge meets the first letter, the picture dragged to bring the top, right and bottom handles into view in turn and each brought in the same way, then Ctrl+C and Ctrl+V, so that the copy is pasted and shown, cut to the pixel |
-| `export` | the mountain's shaded relief under the viridis ramp, a box dragged out a thousand pixels square around the summit, and Export chosen from the file menu: the dialog's first size box set to 25%, and the quarter-size crop written, shown as it lands, and put at its own size |
-| `loupe` | the first of the bird plates, the loupe's toggle in the bottom bar clicked, the pointer glided onto the lower bird's eye, and `Shift+L` pressed 300 ms apart round its four magnifications and back to 4×, then the loupe glided down to the foot |
-| `performance` | a fresh terminal and the window it opens, side by side: `gamut --timing` on a 443 MB Swiss map typed at the prompt, Return, and the timing marks arriving on the left as the map comes up on the right |
+| `export` | the mountain's shaded relief under the viridis ramp, a box dragged out a thousand pixels square around the summit and zoomed into with space, and Export chosen from the file menu: the dialog's first size box set to 25%, and the quarter-size crop written, shown as it lands, and put at its own size |
+| `loupe` | the first of the bird plates, the loupe's toggle in the bottom bar clicked, the pointer glided onto the lower bird's eye, and `Shift+L` pressed 300 ms apart round its four magnifications and back to 4×, the loupe glided down to the foot, then the toggle clicked off and the loupe held up with the right button instead, taken round the upper bird's head |
 | `showcase` | the whole desk rather than the one window, on an empty workspace at scale 2: six pictures of one mountain opened once and walked through — the summit under the wheel, the loupe on a bird's eye, the sun's clipped pixels painted and the frame thrown away, the crater held up the three rasters, the panel that says where on the mountain it is — and Omarchy's own theme menu retinting the desk and the window with it at the end |
 
 ```sh
@@ -52,15 +51,12 @@ The pictures they open are in `images/`: seven of one mountain in
 `images/mora` — a photograph, two raw frames, an aerial and the three
 12.5 m rasters of the same ground — several hundred bird plates in
 `images/birds`, two spatial photos that carry a depth map in
-`images/depth`, and the GIF and the stag beside them. Each script takes
+`images/depth`, and the animated WebP and the stag beside them. Each script takes
 another path as its first argument. `mandelbrot` opens no picture of ours:
 the program that draws its picture is the Rust crate in
 [`mandelbrot-zoom/`](mandelbrot-zoom/), which the script builds if `cargo
 build --release` has not been run there already, or `MANDELBROT` names
-another binary. `performance` opens one too big to keep here, the
-14000×9600 raster of a Swiss 1:50000 map sheet at
-`~/Downloads/swiss-map-raster50_2007_285_krel_2.5_2056.tif`, and wants
-that or another file as its argument.
+another binary.
 
 ## What a script does
 
@@ -74,8 +70,8 @@ The compositor has to do three things the program cannot do for itself:
   which would blend whatever is behind it into the picture.
 - **Put it on a device pixel.** `hyprctl clients` reports the window's
   position and size in logical pixels, and `grim -g` captures that rectangle
-  at the monitor's own scale. On a monitor at scale 1.6 a 1000×600 window
-  comes out as a 1600×960 image, but only every fifth logical position is a
+  at the monitor's own scale. On a monitor at scale 1.6 a 1200×675 window
+  comes out as a 1920×1080 image, but only every fifth logical position is a
   whole device pixel, and a window centered under the bar starts at device
   row 620.8: the first captured row is then Hyprland's border, which is blue
   while the window has focus, gray while it does not, and a half-second fade
@@ -109,26 +105,7 @@ that check typed its query into a browser's print dialog. Between shots the
 pointer is parked on the middle of the top bar, the one place it shows in
 nothing.
 
-## Two windows
-
-`performance` has a terminal beside the window, since what it shows is what
-`--timing` prints. Each window of the pair is where `open` would put one
-window of their combined size, and each is 500 wide, so both start on a
-whole device pixel, and both are given `border_size = 0`: the border is
-drawn outside the window's rectangle, over whatever is next to it, so
-two windows flush against each other would each wear a stripe of the
-other's. `spawn` is what `open` does for gamut, for any command and class
-— here ghostty, as a process of its own, on a shell with no rc file and a
-bare prompt whose PATH begins with a directory holding the binary under
-test as `gamut`. The window that shell starts cannot be handed rules by
-`hl.exec_cmd`, so `rule` sets a named window rule for the run, and turns
-it off when the script ends, whichever way. `FRAME` says what `record`
-captures when it is not the one window's rectangle, and `text` types the
-command line at the prompt: through the device's keyboard, as `press`
-does, because a terminal reads a capital as its letter with Shift held,
-and under wtype's one-level keymap Shift changes nothing. The command is
-typed before the recording starts, so the film is Return, the window, and
-the numbers.
+## Closing
 
 `close` kills the window and then waits for the compositor to forget it.
 The next window can be given the same address, and `open` tells the new
@@ -189,14 +166,22 @@ click until the pointer has gone some pixels from it, and the motion of
 the frame that decides it is not part of the drag; a stroke that sets off
 at speed loses its first several pixels that way. So `drag_to` creeps the
 first ten pixels a couple of units at a time, past the toolkit's distance,
-before it moves at its pace, and what the deciding frame loses is a
-fraction of a pixel.
+before it moves at its pace, and what the deciding frame loses is meant to
+be a fraction of a pixel. Against the program as it is now that is not
+quite so: a pan still comes up six or seven logical pixels short, and a box
+drawn from a press starts a few image pixels past it. `region`, which has
+to land on given pixels, makes up for both: each of its pan strokes is
+drawn six pixels longer than the pan it is counted as, and its box is
+measured rather than assumed, as below.
 
-`region` asks the program, before the film starts, which pixels it takes
-the two placed corners of the box to be over — `Ctrl+Shift+.` copies the
-coordinate, and the clipboard is read back — and counts the presses that
-tighten each edge from its answer, in case its sums and the script's
-differ by a pixel. The toast that says the coordinate was copied is gone
+`region` draws its box once before the film starts and reads where its
+edges came out, then counts the presses that tighten each edge from that.
+The far corner it asks the program for — `Ctrl+Shift+.` copies the
+coordinate of the pixel under the pointer, and the clipboard is read back
+— and the near corner it works out from the size of the box, copied with
+`Ctrl+C` and read off the picture on the clipboard. The box is taken off
+again, the coordinate is asked last so that the clipboard holds words and
+the paste button is not up, and the toast that says it was copied is gone
 before the recorder starts.
 
 Several of the device's actions are done as one hand's `gesture`, the
@@ -249,7 +234,7 @@ runs, and where the rows are and where the picture is both follow from it.
 second, and waits for the `.ts` file it writes beside the film with its
 first frame's wall-clock time. That is the clock the film is cut by:
 `since_record` says how long after the first frame something was done, and
-`clip` and `gif` take a start and a length in those seconds. `animated`
+`clip` takes a start and a length in those seconds. `animated`
 reads the start before it presses `Return` and the length from the file's
 own frame durations, so the clip is one loop of the file from the moment
 play was pressed, and loops where the file does. It reads those durations
@@ -262,15 +247,11 @@ and so reads an 83.33 ms WebP frame as 80. `cut` stops the recorder with
 the front, which is the encode `showcase` delivers. `poster` keeps one
 frame of that clip as a JPEG at the quality `shoot` writes, a still to
 stand in for the film wherever a video cannot be played; its time is in
-the clip's own, so `animated` asks for 9 s of its 12. `gif` is the older
-way out, ffmpeg's two-pass GIF — a palette from the whole clip, then the
-frames dithered against it, each frame only the rectangle that changed —
-at 25 frames a second and 800 pixels wide, and is what the scripts not yet
-moved over to MP4 still call.
+the clip's own, so `animated` asks for 9 s of its 12.
 
 `mandelbrot` is a recording of the file under the window changing and the
 window following, first as it was opened and then under a pan and zoom of
-its own: three seconds in, `+` four times and a turn of the arrows around
+its own: three seconds in, `+` four times and a turn of Shift and the arrows around
 the middle, which is where the renderer is heading, and each frame that
 lands meanwhile comes up under the same view, since a file of the same
 size keeps it; then Space fits the whole picture again. The renderer writes a 1024×1024 frame into
@@ -283,13 +264,13 @@ lets it go with `SIGCONT` once the recorder is running, and every take
 begins on the whole set. Ten seconds is nine steps of the zoom, at 0.8 a
 step.
 
-`themes` has no recording. Its two frames are `still`, which is `shoot`
-losslessly into `$FILMS`, and `flipbook` puts them together with
-ImageMagick, each held for the seconds given, at the window's own size.
-The window is opened once: gamut watches the desktop's palette file and
-retints itself when Omarchy rewrites it, so the second still is the same
-window a few seconds later. The script switches the desk's theme with
-`omarchy-theme-set` and puts it back on whatever it was, however it ends.
+`themes` films the whole monitor rather than the window, as `showcase`
+does and with its staging: an empty workspace, so the desk's background
+stands behind the window, and scale 2, so the 3840×2160 master comes down
+2:1 to the delivered 1920×1080. The window is opened once: gamut watches
+the desktop's palette file and retints itself when Omarchy rewrites it.
+The script puts the workspace, the scale, the theme and the background
+back on whatever they were, however it ends.
 
 ## What the scripts are not
 

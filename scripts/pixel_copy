@@ -1,5 +1,5 @@
 #!/bin/sh
-# The README's pixel readout: a photograph in a 1000x600 window with the
+# The README's pixel readout: a photograph in a 1200x675 window with the
 # grid on, the wheel turned over a spot on the mountain until single pixels
 # are squares, then the pointer taken down to the dot at the head of the
 # readout and held there for its tooltip, the dot pressed, Hex chosen from
@@ -18,28 +18,29 @@ x=${2:-1250}
 y=${3:-660}
 set -- $(magick identify -format '%w %h' "$file")
 
-open 1000 600 "$file"
+open 1200 675 "$file"
 keys g
 record "pixel_copy.mp4" cursor
 started=$(since_record)
 sleep 0.3
 cursor $(fitted "$1" "$2" "$x" "$y")
 sleep 0.3
-# Fourteen notches from a fit of 43% is 982%, where the grid is at 10 px.
+# Fourteen notches from the fit is 1119%, where the grid is at 10 px.
 wheel 14
 sleep 0.5
 
 set -- $(window geometry)
-# The dot is the third button of the bottom bar, after the grid toggle
-# with its reading and the loupe's toggle: 116 logical pixels in from the
-# left edge with the reading at "10 px", on the bar's centerline.
-dot_x=$(($1 + 116))
+# The dot is the fourth button of the bottom bar, after the grid toggle
+# with its reading, the horizon grid's toggle and the loupe's: 146 logical
+# pixels in from the left edge with the reading at "10 px", on the bar's
+# centerline.
+dot_x=$(($1 + 146))
 dot_y=$(($2 + $4 - 15))
 glide "$dot_x" "$dot_y"
 sleep 3
 click
 sleep 1
-# The menu stands over the dot, and Hex is the first of its three cells:
+# The menu stands over the dot, and Hex is the first of its four cells:
 # its middle is 41 right of the dot's and 40 up.
 glide $((dot_x + 41)) $((dot_y - 40))
 sleep 0.8
@@ -52,4 +53,8 @@ press ctrl+dot
 sleep 2
 film=$(cut)
 close
-gif "$film" "pixel_copy.gif" 800 "$started"
+shown=$(clip "$film" "pixel_copy.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the menu up over the dot, the
+# pointer on Hex.
+poster "$shown" "pixel_copy_thumb.jpg" 9

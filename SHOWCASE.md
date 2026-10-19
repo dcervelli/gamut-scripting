@@ -70,7 +70,7 @@ The live scale and the config disagree — `~/.config/hypr/monitors.lua` says
 `scale = 1.25` and `GDK_SCALE = 1`, while the compositor is live at 1.6. So
 **read the live value from `hyprctl monitors -j` and restore to that**; do not
 read the config, and do not assume 1.6 either. Save on entry, restore on exit
-however the run ends, the way `performance` turns its window rule back off.
+however the run ends, the way `themes` puts the scale back.
 
 Two candidate commands, neither tested on Hyprland 0.56.2 with the Lua config:
 

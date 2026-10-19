@@ -1,23 +1,22 @@
 #!/bin/sh
-# The README's region: a web page's screenshot in a 1000x600 window, `x`
-# pressed for the crosshair and a box dragged out around the wordmark in
-# the middle of it, ten pixels loose on every side, then tightened by hand
-# and key. The pointer goes to the handle on the left edge and the wheel
-# zooms in five notches about it, so that the edge and the letters it is
-# to meet are seen close; the handle is clicked to make it the current
+# The README's region: a web page's screenshot in a 1200x675 window (16:9),
+# `x` pressed for the crosshair and a box dragged out around the wordmark
+# in the middle of it, ten pixels loose on every side, then tightened by
+# hand and key. The pointer goes to the handle on the left edge and the
+# wheel zooms in five notches about it, so that the edge and the letters it
+# is to meet are seen close; the handle is clicked to make it the current
 # one, the pointer steps just inside the region, and Right pressed ten
-# times or so brings the edge in to the first letter, a pixel a press,
-# with the region's measurements up the whole way since the pointer is on
-# it, so the edge's coordinate counts as it goes. Then the picture is
-# dragged to bring the handle on the top edge into view, and the same is
-# done there — with the picture dragged a little further once the handle
-# is taken, so that the spike of the M, the highest point the edge is to
-# meet, is in view — and on the right and the bottom. Ctrl+C copies the
-# region, the paste button comes up in the left strip once the clipboard
-# is seen to hold a picture, and Ctrl+V pastes it: the file it writes is
-# shown in the region's place, cut to the pixel. The pointer is in the
-# film, since where it goes is the point, and it moves as a hand would,
-# through device.py.
+# times or so brings the edge in to the first letter, a pixel a press, with
+# the region's measurements up the whole way since the pointer is on it, so
+# the edge's coordinate counts as it goes. Then the picture is dragged to
+# bring the handle on the top edge into view, and the same is done there —
+# with the picture dragged a little further once the handle is taken, so
+# that the spike of the M, the highest point the edge is to meet, is in
+# view — and on the right and the bottom. Ctrl+C copies the region, the
+# paste button comes up in the left strip once the clipboard is seen to
+# hold a picture, and Ctrl+V pastes it: the file it writes is shown in the
+# region's place, cut to the pixel. The pointer is in the film, since where
+# it goes is the point, and it moves as a hand would, through device.py.
 #
 # The zoom and the pans move the picture under the handles, so the script
 # keeps its own account of the view — the image point at the middle of the
@@ -134,11 +133,22 @@ strokes() {
     while [ "$dx" -gt 1 ] || [ "$dx" -lt -1 ] || [ "$dy" -gt 1 ] || [ "$dy" -lt -1 ]; do
         set -- $(window geometry) $(stroke "$dx" 700) $(stroke "$dy" 400)
         set -- $(($1 + $3 / 2 - $5 / 2)) $(($2 + $4 / 2 - $6 / 2)) "$5" "$6"
-        WORDS="$WORDS glide $1 $2 -- drag_to $(($1 + $3)) $(($2 + $4)) --"
+        WORDS="$WORDS glide $1 $2 -- drag_to $(($1 + $3 + $(slack "$3"))) $(($2 + $4 + $(slack "$4"))) --"
         eval "$(view -v what=panned -v dx="$3" -v dy="$4")"
         dx=$((dx - $3))
         dy=$((dy - $4))
     done
+}
+
+# What a stroke of D is drawn longer by, that way: the picture follows a drag
+# only once the pointer has gone a few points from the press, so a stroke
+# pans that much short of its length, and the view would drift a little
+# further from the sums with every stroke.
+slack() {
+    if [ "$1" -gt 0 ]; then echo 6
+    elif [ "$1" -lt 0 ]; then echo -6
+    else echo 0
+    fi
 }
 
 # As much of the distance D as one stroke may take, up to MOST either way.
@@ -183,23 +193,34 @@ rm -rf "$FILMS/pasted"
 environment XDG_PICTURES_DIR "$FILMS/pasted"
 
 keep_pointer
-open 1000 600 "$file"
+open 1200 675 "$file"
 eval "$(view -v what=fit)"
 
 # The box is every pixel the drag touched, so it is drawn from the pixel
 # `loose` outside the top left corner to the one `loose` outside the
-# bottom right — or the pixels the program reads those two points as,
-# which it is asked first. Its edges are then the boundaries just outside
-# those pixels: `right` and `bottom` here are the far edges, one past the
-# last pixel, which is where their handles sit.
+# bottom right. Its far corner is the pixel the program reads the drag's
+# end as, which it is asked; `right` and `bottom` are the edges just
+# outside that pixel, one past the last, which is where their handles sit.
+# Its near corner is not where the press was: the toolkit takes the drag
+# as begun only some way from the press, and the box starts a few pixels
+# on. So the box is drawn once before the film, the same drag, copied,
+# and the near edges read from the size of the picture copied; then taken
+# off again. The coordinates are asked after, so that what is left on the
+# clipboard is words, and the paste button is not up when the film starts.
 begin=$(pixel $((x - loose)) $((y - loose)))
 end=$(pixel $((x + w - 1 + loose)) $((y + h - 1 + loose)))
-set -- $(under $begin)
-left=$1
-top=$2
+keys x
+gesture place $begin -- drag_to $end placed -- rest 0.3 -- key ctrl+c
+sleep 0.5
+set -- $(wl-paste -t image/png | magick identify -format '%w %h' -)
+across=$1
+down=$2
+keys x
 set -- $(under $end)
 right=$(($1 + 1))
 bottom=$(($2 + 1))
+left=$((right - across))
+top=$((bottom - down))
 # The last toast has to be gone before the film starts.
 sleep 3.2
 
@@ -223,13 +244,13 @@ left=$x
 # to the left of the edge's middle — the spike of the M — so once the
 # handle is taken the picture is dragged a little further right, to have
 # that point in view as the edge comes down to it.
-stage $(((left + right) / 2)) "$top" down $((y - top)) $(($1 + 560)) $(($2 + 200)) $(($1 + 800)) $(($2 + 200))
+stage $(((left + right) / 2)) "$top" down $((y - top)) $(($1 + 672)) $(($2 + 225)) $(($1 + 960)) $(($2 + 225))
 top=$y
 
-stage "$right" $(((top + bottom) / 2)) left $((right - x - w)) $(($1 + 860)) $(($2 + 300))
+stage "$right" $(((top + bottom) / 2)) left $((right - x - w)) $(($1 + 1032)) $(($2 + 338))
 right=$((x + w))
 
-stage $(((left + right) / 2)) "$bottom" up $((bottom - y - h)) $(($1 + 500)) $(($2 + 400))
+stage $(((left + right) / 2)) "$bottom" up $((bottom - y - h)) $(($1 + 600)) $(($2 + 450))
 
 # The toast says what was copied, and the paste button follows once the
 # clipboard has been looked at.
@@ -238,4 +259,8 @@ keyboard
 gesture $WORDS
 film=$(cut)
 close
-gif "$film" "region.gif" 800 "$started"
+shown=$(clip "$film" "region.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the wheel partway in over the
+# left edge's handle, the loose box around the wordmark and its size up.
+poster "$shown" "region_thumb.jpg" 3.733

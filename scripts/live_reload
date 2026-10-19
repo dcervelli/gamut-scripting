@@ -1,0 +1,242 @@
+#!/bin/sh
+# Live reloading: gamut opened on a directory and a terminal beside it, so
+# that what the terminal does to the files there is seen to land in the
+# window as it happens. The two share one 1200x675 frame (16:9), gamut the
+# left two thirds of it and the terminal the right third, on an empty
+# workspace, where nothing else of the desk's comes into the picture.
+#
+# The directory is one of the script's own under $FILMS, cleared and made
+# again each run with the elevation model alone in it, a copy rather than a
+# link, since the files there are the terminal's to change and the ones in
+# images/mora are not to be.
+#
+# The terminal is Ghostty, started as a process of its own and under a
+# class of its own: the desk's terminals all belong to one Ghostty process
+# and one class, so without both the window would not be told from the
+# others, and closing it would close them all. Its shell is a bare bash
+# with a bare `$` for a prompt, so that the desk's own prompt — the path,
+# the branch — is not in the film.
+#
+# The film is the frame, from the moment the two windows are up: the file
+# name copied in gamut with C and pasted into the first line rather than
+# spelled out, the hillshade it makes opened and zoomed in on, and the
+# line run again with the light moved round, gamut showing each new
+# hillshade as it is written. Partway through, R in gamut puts the
+# picture in false color, and the reloads after it come in colored.
+#
+#   scripts/live_reload                  on HDMI-A-1, workspace 4
+#   WORKSPACE=9 scripts/live_reload      on another empty workspace
+
+. "$(dirname "$0")/../lib.sh"
+
+command -v ghostty >/dev/null || { echo "ghostty is not installed" >&2; exit 1; }
+
+WORKSPACE=${WORKSPACE:-4}
+TERMINAL=com.dcervelli.gamut-live-reload
+DEM=mora_dem_12.5m_utm10.tif
+DIR=$FILMS/live_reload
+# The summit, in the elevation model's own pixels: its highest, at 4389 m.
+SUMMIT_X=2356
+SUMMIT_Y=2352
+
+# The frame, and how it is shared.
+WIDTH=1200
+HEIGHT=675
+SPLIT=$((WIDTH * 2 / 3))
+
+hyprctl eval "hl.dispatch(hl.dsp.focus({ workspace = \"$WORKSPACE\" }))" >/dev/null
+sleep 0.4
+
+rm -rf -- "$DIR"
+mkdir -p -- "$DIR"
+cp -- "$ROOT/images/mora/$DEM" "$DIR/$DEM"
+
+# Placed as one window the frame's size would be, and then split: 800 and
+# 400 logical pixels are both whole device pixels at scale 1.6, so the
+# terminal's edge is as aligned as gamut's. The placement is from the
+# monitor's corner, as the rules take it; the frame is in the layout, as
+# the capture takes it, so it is moved by where the monitor stands there.
+set -- $(placement "$WIDTH" "$HEIGHT") \
+    $(hyprctl monitors -j | jq -r '.[] | select(.focused) | "\(.x) \(.y)"')
+x=$1
+y=$2
+FRAME="$(($3 + x)) $(($4 + y)) $WIDTH $HEIGHT"
+
+# What is typed into the terminal, a character at a time, one wtype call
+# to a character for the reason `keys` gives.
+typing() {
+    keyboard
+    printf '%s\n' "$1" | fold -w 1 | while IFS= read -r c; do
+        wtype -- "${c:- }"
+        sleep "${PACE:-0.05}"
+    done
+}
+
+# Gamut first, for `loaded` to watch its title; the terminal second. Which
+# of the two WINDOW is says which one `keyboard`, `loaded` and the rest are
+# about, and the script sets it each time it turns from one to the other.
+handsoff
+sort_by name ascending
+spawn "$CLASS" "$SPLIT" "$HEIGHT" "$x" "$y" \
+    "env${ENVIRONMENT:-} $GAMUT --size $SPLIT $HEIGHT $(shell_quote "$DIR")"
+loaded
+VIEWER=$WINDOW
+spawn "$TERMINAL" $((WIDTH - SPLIT)) "$HEIGHT" $((x + SPLIT)) "$y" \
+    "ghostty --gtk-single-instance=false --class=$TERMINAL --working-directory=$(shell_quote "$DIR") -e env PS1=$(shell_quote '$ ') bash --norc --noprofile"
+CONSOLE=$WINDOW
+WINDOW=$VIEWER
+set -- $(window geometry)
+wx=$1
+wy=$2
+ww=$3
+wh=$4
+WINDOW=$CONSOLE
+set -- $(window geometry)
+tx=$1
+ty=$2
+tw=$3
+th=$4
+sleep 1
+
+# Where the pointer waits while the terminal is typed in: low in it, under
+# all the lines the film runs, which reach a little over halfway down.
+rest_x=$((tx + tw / 2))
+rest_y=$((ty + th * 7 / 8))
+
+# The pointer goes in for each turn to gamut, and back out for each turn
+# to the terminal; focus follows it, so where it is is which window has
+# the keyboard. In gamut it goes to the left of the picture, out of the way
+# of the summit.
+to_viewer() {
+    WINDOW=$VIEWER
+    gesture glide $((wx + ww / 2 - 60)) $((wy + wh / 2)) -- rest 0.4
+}
+
+to_console() {
+    WINDOW=$CONSOLE
+    gesture glide "$rest_x" "$rest_y" -- rest 0.4
+}
+
+record "live_reload.mp4" cursor
+started=$(since_record)
+sleep 0.8
+
+# C copies the name of the file on screen, the only one in the directory.
+to_viewer
+keys c
+sleep 1.0
+
+# The light's direction last on the line, so that each run after the first
+# is the line called back and only the number at its end changed. The
+# name goes in with Ctrl+Shift+V, which is Ghostty's paste.
+to_console
+azimuth=0
+typing "gdaldem hillshade "
+sleep 0.3
+keys ctrl-shift-v
+sleep 0.4
+typing " hillshade.jpg -az $azimuth"
+sleep 0.2
+wtype -k Return
+sleep 3
+
+# The hillshade comes in at the head of the list, which gamut opens itself
+# once there is more than one file: the first row is clicked across the
+# middle of the panel. The panel is the width gamut keeps between runs for
+# a thumbnail, the room either side of it and the scrollbar's gutter; the
+# row is under the top bar and the list's head, a bar each, and is a title
+# of 22, 4 over the slot and 8 under it, the slot as tall as the picture's
+# shape makes it — the hillshade's is the elevation model's.
+state=${XDG_STATE_HOME:-$HOME/.local/state}/gamut/state
+slot=
+[ -f "$state" ] && slot=$(awk -F '[ =]+' '$1 == "filmstrip_width" { print int($2) }' "$state")
+slot=${slot:-148}
+panel=$((slot + 2 * 8 + 10))
+set -- $(magick identify -format '%w %h' "$DIR/$DEM")
+W=$1
+H=$2
+row=$(awk -v slot="$slot" -v W="$W" -v H="$H" 'BEGIN {
+    shape = H / W
+    if (shape < 0.5) shape = 0.5
+    if (shape > 1.5) shape = 1.5
+    print int(60 + (22 + 4 + int(slot * shape + 0.5) + 8) / 2)
+}')
+WINDOW=$VIEWER
+gesture glide $((wx + panel / 2)) $((wy + row)) -- rest 0.5 -- click
+loaded
+sleep 1.2
+
+# In on the summit, and the summit taken to the middle of the right third
+# of what the list and the bars leave of the window, level with its middle.
+# The picture fits the window to begin with and could not be dragged at
+# all, so the wheel goes first, over the summit, and the drag after it.
+# Six notches from a fit of 21% is 80%.
+#
+# The wheel zooms about the pointer, but the program never lets a picture
+# that is shorter than the window move off its middle, and this one is for
+# the first few notches, so the summit is pulled up and away from the
+# pointer while it grows. Where it ends up is worked out notch by notch,
+# the way the program does it — each notch 1.25 times the last about the
+# pointer, and then held at the picture's edges — and the drag starts
+# there.
+notches=6
+summit=$(fitted "$W" "$H" "$SUMMIT_X" "$SUMMIT_Y" "$panel")
+aim="$((wx + panel + 30 + (ww - panel - 60) * 5 / 6)) $((wy + wh / 2))"
+zoomed=$(awk -v W="$W" -v H="$H" -v SX="$SUMMIT_X" -v SY="$SUMMIT_Y" \
+    -v left=$((wx + panel + 30)) -v top=$((wy + 30)) \
+    -v vw=$((ww - panel - 60)) -v vh=$((wh - 60)) \
+    -v pointer="$summit" -v n="$notches" '
+    function clamp(v, size, extent,   limit) {
+        limit = size / 2 - extent / (2 * VZ); if (limit < 0) limit = 0
+        if (v < size / 2 - limit) v = size / 2 - limit
+        if (v > size / 2 + limit) v = size / 2 + limit
+        return v
+    }
+    BEGIN {
+        split(pointer, p, " ")
+        cx = left + vw / 2; cy = top + vh / 2
+        VZ = vw / W; if (vh / H < VZ) VZ = vh / H
+        VX = W / 2; VY = H / 2
+        for (i = 0; i < n; i++) {
+            ax = VX + (p[1] - cx) / VZ; ay = VY + (p[2] - cy) / VZ
+            VZ *= 1.25
+            VX = clamp(ax - (p[1] - cx) / VZ, W, vw)
+            VY = clamp(ay - (p[2] - cy) / VZ, H, vh)
+        }
+        printf "%d %d\n", cx + (SX - VX) * VZ + 0.5, cy + (SY - VY) * VZ + 0.5
+    }')
+gesture glide $summit -- rest 0.4 -- wheel "$notches" 0.8 -- rest 0.6 \
+    -- glide $zoomed -- rest 0.2 -- drag_to $aim -- rest 1.0
+
+# Back to the terminal, and the line again with the light further round
+# each time: called back with Up, the number taken off its end with
+# Backspace and the new one typed. The hillshade on screen is written over
+# each time, and gamut shows the new one in its place. After 20, R in
+# gamut puts it in false color, which the reloads after keep.
+to_console
+for step in 10 20 r 30 235; do
+    if [ "$step" = r ]; then
+        to_viewer
+        keys r
+        sleep 1.5
+        to_console
+        continue
+    fi
+    PACE=0.12
+    keys Up $(printf "%${#azimuth}s" | sed 's/ / BackSpace/g')
+    PACE=
+    typing "$step"
+    sleep 0.2
+    wtype -k Return
+    azimuth=$step
+    sleep 3
+done
+
+film=$(cut)
+close
+shown=$(clip "$film" "live_reload.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: its last moments, the light at
+# 235 in false color and every line of the terminal there to read.
+length=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$shown")
+poster "$shown" "live_reload_thumb.jpg" "$(awk -v l="$length" 'BEGIN { print l - 0.5 }')"

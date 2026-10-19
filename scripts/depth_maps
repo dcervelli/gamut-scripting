@@ -1,17 +1,22 @@
 #!/bin/sh
-# The README's depth maps: a spatial photo in a 1000x600 window, the depth
-# toggle at the right end of the bottom bar clicked on with the pointer so
-# that the map stands in the picture's place, and then the readout at the
-# other end of the same bar told to say depths — the dot at its head opens
-# the menu of ways to write a pixel's value, and Depth is the last of the
-# four — and the pointer walked across the map, from the desk in the
-# foreground out to the garden beyond the window and back to the metal on
-# the desk, with the distance under it written in the bar as it goes.
+# The README's depth maps: a spatial photo in a 1200x675 window with the
+# information panel open and turned down to its Depth map section, the
+# depth toggle at the right end of the bottom bar clicked on with the
+# pointer so that the map stands in the picture's place, and then the
+# readout at the other end of the same bar told to say depths — the dot at
+# its head opens the menu of ways to write a pixel's value, and Depth is
+# the last of the four — and the pointer walked across the map, from the
+# desk in the foreground out to the garden beyond the window and back to
+# the metal on the desk, with the distance under it written in the bar as
+# it goes.
 #
 # The two ends of the bottom bar are the whole of it: the toggle is how the
 # map is found, since it is drawn only for a file that carries one, and the
 # readout is what the map is for. The walk is the point of the film, and so
-# has the map up under it rather than the photograph.
+# has the map up under it rather than the photograph. The panel is there
+# for its Depth map section, which says what the map is — its size, what
+# it encodes and the range it covers — and takes the Showing pill from the
+# Image section when the map goes up.
 #
 #   scripts/depth_maps                  on images/depth/spatial_depth.heic
 #   scripts/depth_maps FILE             on another file carrying a depth map
@@ -25,35 +30,53 @@ set -- $(magick identify -format '%w %h\n' "$file" | head -1)
 W=$1
 H=$2
 
-open 1000 600 "$file"
+# The readout's format is kept between runs; it is set back to hex at the
+# end, but pinned here too, so that a run that stopped early is not
+# followed by one that finds Depth already lit.
+remember pixel_format hex
+open 1200 675 --info "$file"
+# The column turned to its foot before the film starts, where the Gain
+# map, Depth map and Regions sections stand: the wheel turns it only with
+# the pointer over it, 200 in from the window's right edge, and twenty
+# notches is more than it has to give.
+set -- $(window geometry)
+glide $(($1 + $3 - 200)) $(($2 + 300))
+wheel -20
+settle
 keep_pointer
+# What the panel takes off the right of the picture's area, past the
+# strip: the picture is centered in what is left.
+panel=294
 
 record "depth_maps.mp4" cursor
 started=$(since_record)
 sleep 0.5
-# The depth toggle is the second thing in from the right end of the bottom
-# bar, after the HDR switch: 4 + 42 + 12 pixels of padding, switch and gap
-# take the bar to its left edge, and 11 more to its middle.
+# The depth toggle is the third thing in from the right end of the bottom
+# bar, after the HDR switch and the gain map's toggle, since this file
+# carries both: 4 + 42 + 12 pixels of padding, switch and gap take the bar
+# to the gain map's left edge, 22 + 12 more past it, and 11 more to the
+# depth toggle's middle.
 set -- $(window geometry)
-glide $(($1 + $3 - 69)) $(($2 + $4 - 15))
+glide $(($1 + $3 - 103)) $(($2 + $4 - 15))
 # Long enough on the button for its tooltip to come up and be read.
 sleep 1.0
 click
 sleep 1.5
-# The dot at the head of the readout is the third button in from the left
-# end of the same bar, after the grid's toggle and the loupe's, neither of
-# which carries a reading here: 4 pixels of padding, two 22-wide buttons
-# with 8 between them, and 11 more to the dot's middle.
-dot_x=$(($1 + 75))
+# The dot at the head of the readout is the fourth button in from the left
+# end of the same bar, after the grid's toggle, the horizon grid's and the
+# loupe's, none of which carries a reading here: 4 pixels of padding,
+# three 22-wide buttons with 8 between them, and 11 more to the dot's
+# middle.
+dot_x=$(($1 + 105))
 dot_y=$(($2 + $4 - 15))
 glide "$dot_x" "$dot_y"
 sleep 1.0
 click
 sleep 1.0
-# The menu stands over the dot, its Pixel value row along the foot: four
-# 84-wide cells 6 apart, of which Hex's middle is 41 right of the dot's and
-# 40 up, so Depth's, the last, is three cells further right.
-glide $((dot_x + 41 + 3 * 90)) $((dot_y - 40))
+# The menu stands over the dot, its Pixel value row above the Coordinate
+# row: four 84-wide cells 6 apart, of which Hex's middle is 41 right of the
+# dot's and 94 up, so Depth's, the last, is three cells further right.
+glide $((dot_x + 41 + 3 * 90)) $((dot_y - 94))
 sleep 1.0
 click
 sleep 1.0
@@ -67,9 +90,9 @@ sleep 1.0
 # map: the map is 768x576 to the photograph's 5712x4284, and both being
 # four by three they are fitted into the same rectangle, so a point of the
 # one is the same place on screen as the point of the other.
-gesture glide $(fitted "$W" "$H" 700 3800) \
-     -- glide $(fitted "$W" "$H" 5300 2300) \
-     -- glide $(fitted "$W" "$H" 2850 3000)
+gesture glide $(fitted "$W" "$H" 700 3800 0 "$panel") \
+     -- glide $(fitted "$W" "$H" 5300 2300 0 "$panel") \
+     -- glide $(fitted "$W" "$H" 2850 3000 0 "$panel")
 # Long enough to read the last distance the walk left in the bar.
 sleep 1.5
 film=$(cut)
@@ -80,4 +103,9 @@ film=$(cut)
 # through the four, and Depth is the last of them.
 keys period
 close
-gif "$film" "depth_maps.gif" 800 "$started"
+shown=$(clip "$film" "depth_maps.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the map up, the pointer at the
+# end of its walk on the metal hexagon, and the bar saying how far away
+# that is.
+poster "$shown" "depth_maps_thumb.jpg" 14.5

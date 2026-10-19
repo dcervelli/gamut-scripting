@@ -1,5 +1,5 @@
 #!/bin/sh
-# The README's pixel grid: a landscape in a 1000x600 window, the grid
+# The README's pixel grid: a landscape in a 1200x675 window (16:9), the grid
 # toggle clicked on, the wheel turned over the stag until the grid is down
 # to single pixels, a beat, and Space to fit the whole picture again. The
 # mouse is device.py's, and the pointer is in the film, since what it is
@@ -15,7 +15,7 @@ x=${2:-957}
 y=${3:-2172}
 set -- $(magick identify -format '%w %h' "$file")
 
-open 1000 600 "$file"
+open 1200 675 "$file"
 record "pixel_grid.mp4" cursor
 started=$(since_record)
 sleep 0.3
@@ -28,7 +28,7 @@ click
 sleep 0.8
 glide $(fitted "$1" "$2" "$x" "$y")
 sleep 0.5
-# Twenty-five notches from a fit of a quarter is past the zoom ceiling, and
+# Twenty-five notches from a fit of 29% is past the zoom ceiling, and
 # the grid is at one pixel from about 5700% on.
 wheel 25
 # The last notch's motion has 200 ms to run, and the pause is 1.2 s; the
@@ -39,4 +39,8 @@ settle
 sleep 1.2
 film=$(cut)
 close
-gif "$film" "pixel_grid.gif" 800 "$started"
+shown=$(clip "$film" "pixel_grid.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: at the zoom ceiling, the grid at
+# single pixels over the stag and the readout saying so.
+poster "$shown" "pixel_grid_thumb.jpg" 6.5

@@ -1,0 +1,119 @@
+#!/bin/sh
+# The horizon grid: a phone's photo of the Kansas capitol in a 1200x675
+# window (16:9), the information toggle in the right strip clicked and the
+# Curated tab wheeled down to Orientation, the pointer held on its camera a
+# moment, which draws the level line across the picture; then the horizon
+# grid's toggle in the bottom bar clicked, the wheel turned into the left
+# of the picture where the tower stands against the sky with the moon above
+# it, the pointer put beside the tower so that the upright through it runs
+# down the tower's edge, and then on the moon.
+#
+# The pointer is in the film, since the grid draws its own lines through
+# it, and it moves as a hand would, through device.py.
+#
+#   scripts/horizon_grid                  on images/wichita.heic
+#   scripts/horizon_grid FILE EX EY MX MY ZX ZY
+#                     on another file: the pointer beside an upright at EX,
+#                     EY, then on MX, MY, after the wheel is turned about
+#                     ZX, ZY
+
+. "$(dirname "$0")/../lib.sh"
+
+file=${1:-$ROOT/images/wichita.heic}
+# In the sky just above the tower's top left corner, where the upright
+# through the pointer runs down the tower's edge, which is at 900 across at
+# row 2140 and 862 at 2600: found by looking, since the upright leans a
+# little more than the edge does and is not quite on its extension.
+ex=${2:-882}
+ey=${3:-1950}
+# The moon, a little to the left of its middle.
+mx=${4:-1348}
+my=${5:-1006}
+# Four notches, 1.25 each, about this pixel leave the moon near the head
+# of the view and the tower's top at its foot, right of the minimap, with
+# the panel open, and the picture clear of its edges, where the pan would
+# stop short and the pixel under the pointer move.
+zx=${6:-221}
+zy=${7:-1478}
+notches=4
+
+# The spacing of the grid's uprights is kept between runs; 10 degrees is
+# what it starts at.
+remember horizon_step 10
+# The bottom bar's readout of the pointer as azimuth and elevation, the
+# horizon grid's own terms.
+remember coordinate_format direction
+open 1200 675 "$file"
+set -- $(magick identify -format '%w %h' "$file")
+w=$1
+h=$2
+# The information panel takes this much off the right of the picture.
+panel=294
+
+# Where image pixel X, Y is once the wheel has turned about ZX, ZY: a zoom
+# about the pointer keeps the pixel under it where it was and moves every
+# other one away from it by the zoom's factor. The pixel under it is the
+# one under the whole logical point the pointer was glided to, which is
+# what `fitted` gives; the rest is `fitted`'s sum again, kept in fractions.
+zoomed() {
+    set -- "$1" "$2" $(fitted "$w" "$h" "$zx" "$zy" 0 "$panel") $(window geometry) $(scale)
+    awk -v W="$w" -v H="$h" -v X="$1" -v Y="$2" -v ax="$3" -v ay="$4" -v panel="$panel" \
+        -v wx="$5" -v wy="$6" -v ww="$7" -v wh="$8" -v scale="$9" -v n="$notches" -v bar=30 'BEGIN {
+        vw = (ww - 2 * bar - panel) * scale; vh = (wh - 2 * bar) * scale
+        zoom = vw / W; if (vh / H < zoom) zoom = vh / H
+        left = wx + bar + (vw - W * zoom) / 2 / scale; top = wy + bar + (vh - H * zoom) / 2 / scale
+        # The pixel under the anchor, and how many logical pixels an image
+        # pixel is once zoomed.
+        zx = (ax - left) * scale / zoom; zy = (ay - top) * scale / zoom
+        k = zoom * 1.25 ^ n / scale
+        printf "%d %d\n", ax + (X - zx) * k, ay + (Y - zy) * k
+    }'
+}
+
+keep_pointer
+record "horizon_grid.mp4" cursor
+started=$(since_record)
+# The picture on its own before anything is pointed at.
+sleep 1.5
+
+set -- $(window geometry)
+# The information toggle is the second button of the right strip.
+glide $(($1 + $3 - 15)) $(($2 + 75))
+sleep 1.0
+click
+sleep 1.0
+# Down the column to Orientation, at a pace that can be followed: the
+# wheel turns it only with the pointer over it, 200 in from the right.
+glide $(($1 + $3 - 200)) $(($2 + 300))
+sleep 0.3
+wheel -4 2
+sleep 0.5
+# On the section's camera, which lays the level line over the picture.
+glide $(($1 + $3 - 170)) $(($2 + 330))
+sleep 2.0
+
+# The horizon grid's toggle, second in the bottom bar after the pixel
+# grid's, 45 in from the left on the bar's centerline.
+glide $(($1 + 45)) $(($2 + $4 - 15))
+# Long enough on the button for its tooltip to come up and be read.
+sleep 1.2
+click
+sleep 1.0
+
+glide $(fitted "$w" "$h" "$zx" "$zy" 0 "$panel")
+sleep 0.4
+wheel "$notches" 1.5
+sleep 1.0
+
+# Beside the tower, the upright through the pointer down its edge.
+glide $(zoomed "$ex" "$ey")
+sleep 2.5
+glide $(zoomed "$mx" "$my")
+sleep 2.5
+film=$(cut)
+close
+shown=$(clip "$film" "horizon_grid.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the grid over the zoomed sky, the
+# upright through the pointer down the tower's edge, the moon above.
+poster "$shown" "horizon_grid_thumb.jpg" 23

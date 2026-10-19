@@ -1,16 +1,18 @@
 #!/bin/sh
 # The README's file chooser: a directory of several hundred pictures in a
-# 1000x600 window, the counter at the head of the top bar pressed to open
-# the chooser, a few letters typed and one chosen; then Ctrl+P and a file
-# asked for by its number, typed slowly enough to be read. The pointer is
-# in the film for the press.
+# 1200x675 window (16:9), the counter at the head of the top bar pressed to
+# open the chooser, a few letters typed and one chosen; then Ctrl+P and a
+# file asked for by its number, typed slowly enough to be read. The pointer
+# is in the film for the press.
 #
 #   scripts/fuzzy_finder                  on images/birds
 #   scripts/fuzzy_finder DIR              on another directory
 
 . "$(dirname "$0")/../lib.sh"
 
-open 1000 600 "${1:-$ROOT/images/birds}"
+# File 200 is a place in the list, so the list's order is pinned.
+sort_by name ascending
+open 1200 675 "${1:-$ROOT/images/birds}"
 # The file list comes up down the left with a directory open; Tab puts it
 # away, so that the film is of the chooser rather than of the list.
 keys Tab
@@ -31,18 +33,22 @@ sleep 1
 # The letters a little slower than a burst, the number slow enough to be
 # read digit by digit.
 PACE=0.15
-keys g y r
+keys s n i p e
 sleep 1
 unset PACE
 keys Return
 sleep 1
 press ctrl+p
 PACE=0.3
-keys colon 4 0 0
+keys colon 2 0 0
 unset PACE
 sleep 1
 keys Return
 sleep 1
 film=$(cut)
 close
-gif "$film" "fuzzy_finder.gif" 800 "$started"
+shown=$(clip "$film" "fuzzy_finder.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the chooser filtered to the
+# snipes by the letters typed.
+poster "$shown" "fuzzy_finder_thumb.jpg" 4.4

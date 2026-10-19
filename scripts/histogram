@@ -1,9 +1,9 @@
 #!/bin/sh
-# The README's histogram: a photograph in a 1000x600 window, the histogram
-# button in the right strip pressed, the black handle on the band dragged
-# in from the left and the white handle in from the right, so that the
-# window is narrower than the picture's range and both corners of the plot
-# say how much is being thrown away, then the button beside the band
+# The README's histogram: a photograph in a 1200x675 window, the histogram
+# button in the right strip pressed, the black handle on the Display
+# section's band dragged in from the left and the white handle in from the right, so that the
+# window is narrower than the picture's range and the curve over the plot
+# clips at both ends, then the warning triangle at the head of the panel
 # pressed to paint the clipped pixels on the picture itself: blue where it
 # has gone black, red where it has gone white, with the pointer brought
 # over the picture so that the button's tooltip is not over the panel
@@ -18,7 +18,8 @@
 
 file=${1:-$ROOT/images/mora/mora.jpg}
 
-open 1000 600 "$file"
+open 1200 675 "$file"
+keep_pointer
 record "histogram.mp4" cursor
 started=$(since_record)
 sleep 0.2
@@ -31,37 +32,47 @@ sleep 0.5
 click
 sleep 0.8
 
-# The band is as wide as the plot, one logical pixel a bin: 256 wide, its
-# right end a panel's inset in from the right strip, and its handles stand
+# The Display section's band, under its plot, is 256 logical pixels wide,
+# its right end 54 in from the window's right edge, and its handles stand
 # on its ends. Each is dragged a fifth of the way in.
-band_y=$(($2 + 195))
-black_x=$(($1 + 692))
-white_x=$(($1 + 948))
+band_y=$(($2 + 358))
+black_x=$(($1 + $3 - 310))
+white_x=$(($1 + $3 - 54))
 glide "$black_x" "$band_y"
 sleep 0.3
-drag 50 0
+drag_to $((black_x + 50)) "$band_y"
 sleep 0.8
 glide "$white_x" "$band_y"
 sleep 0.3
-drag -50 0
+drag_to $((white_x - 50)) "$band_y"
 sleep 0.8
 
-# The marks button is the one beside the band, at the foot of the strip
-# down the panel's left: a panel's inset in from the panel's edge, and
-# centered on the band. It is a toggle, lit while the marks are on.
-marks_x=$(($1 + 671))
+# The marks button is the warning triangle in the panel's header row, the
+# first of the two at its right end. It is a toggle, lit while the marks
+# are on.
+marks_x=$(($1 + $3 - 74))
+marks_y=$(($2 + 50))
 picture_x=$(($1 + $3 / 2))
 picture_y=$(($2 + $4 * 2 / 3))
-glide "$marks_x" "$band_y"
+glide "$marks_x" "$marks_y"
 sleep 0.3
 click
 glide "$picture_x" "$picture_y"
 sleep 1.5
-glide "$marks_x" "$band_y"
+glide "$marks_x" "$marks_y"
 sleep 0.3
 click
 glide "$picture_x" "$picture_y"
 sleep 1
 film=$(cut)
 close
-gif "$film" "histogram.gif" 800 "$started"
+shown=$(clip "$film" "histogram.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: both handles in, the pointer
+# just off the white one with its tooltip up, and the picture under the
+# narrowed window before the marks go on.
+poster "$shown" "histogram_thumb.jpg" 8.5
+# Cropped, still 16:9, to end just under the Image histogram's scale and
+# to keep the right edge, so the panel is larger in the still.
+magick "$SCREENSHOTS/histogram_thumb.jpg" -crop 1572x884+348+0 +repage \
+    -quality 92 "$SCREENSHOTS/histogram_thumb.jpg"

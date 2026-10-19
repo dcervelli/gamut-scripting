@@ -1,5 +1,5 @@
 #!/bin/sh
-# The README's "Open in…" menu: a photograph in a 1000x600 window, the
+# The README's "Open in…" menu: a photograph in a 1200x675 window, the
 # open button — second in the left strip, under the copy button — pressed,
 # and the menu of what else on this desk will open the file left standing
 # beside it. What the menu lists is whatever the desktop has installed for
@@ -12,7 +12,7 @@
 
 . "$(dirname "$0")/../lib.sh"
 
-open 1000 600 "${1:-$ROOT/images/mora/mora.jpg}"
+open 1200 675 "${1:-$ROOT/images/mora/mora.jpg}"
 keys space
 
 set -- $(window geometry)
@@ -24,3 +24,9 @@ click
 sleep 0.5
 shoot "open_in.jpg"
 close
+# The still cut down for where a small picture stands in: 16:9 from the
+# window's top left corner, 1040x585 device pixels, which the menu runs
+# down three quarters of, with the top bar and the lit button above it.
+magick "$SCREENSHOTS/open_in.jpg" -crop 1040x585+0+0 +repage -quality 92 \
+    "$SCREENSHOTS/open_in_thumb.jpg"
+echo "$SCREENSHOTS/open_in_thumb.jpg"

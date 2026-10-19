@@ -1,5 +1,5 @@
 #!/bin/sh
-# The README's export: the mountain's shaded relief in a 1000x600 window,
+# The README's export: the mountain's shaded relief in a 1200x675 window,
 # `r` pressed once to lay the viridis ramp over it, `x` for the crosshair
 # and a box dragged out a thousand pixels square around the summit, then
 # the button before the name in the top bar pressed and Export chosen from
@@ -76,7 +76,7 @@ shown() {
 }
 
 keep_pointer
-open 1000 600 "$@"
+open 1200 675 "$@"
 keys Tab $steps
 loaded
 settle
@@ -103,6 +103,11 @@ sleep 0.4
 # the region is made of.
 gesture place $corner -- rest 0.4 -- drag_to $opposite placed -- rest 1.2
 
+# Space zooms the view to the region, so that what is about to be written
+# fills the window before the dialog comes up over it.
+keys space
+sleep 1.5
+
 # The button that opens the menu of the file stands before the name in the
 # top bar, after the file list's toggle and then the two chevrons and the
 # count between them: 136 across with the count at "4 / 4", on the bar's
@@ -114,12 +119,12 @@ gesture place $corner -- rest 0.4 -- drag_to $opposite placed -- rest 1.2
 # and Export is the last of them, 240 down.
 #
 # The dialog is 360 wide and centered in the window, so the rest of this is
-# measured from the window's corner as well: the first of the three size
-# boxes under the formats, and Export at the foot beside Cancel.
+# measured from the window's middle: the first of the three size boxes
+# under the formats, and Export at the foot beside Cancel.
 set -- $(window geometry)
 gesture glide $(($1 + 136)) $(($2 + 14)) -- rest 0.4 -- click -- rest 0.9 \
     -- glide $(($1 + 180)) $(($2 + 240)) -- rest 0.5 -- click -- rest 1.2 \
-    -- glide $(($1 + 390)) $(($2 + 336)) -- rest 0.4 -- click -- rest 0.5
+    -- glide $(($1 + $3 / 2 - 110)) $(($2 + $4 / 2 + 36)) -- rest 0.4 -- click -- rest 0.5
 
 # The box holds the hundred it opened at; Ctrl+A takes all of it, and what
 # is typed replaces it. The two beside it follow as the digits land.
@@ -130,7 +135,7 @@ keys 2 5
 unset PACE
 sleep 1.4
 
-gesture glide $(($1 + 644)) $(($2 + 418)) -- rest 0.5 -- click
+gesture glide $(($1 + $3 / 2 + 144)) $(($2 + $4 / 2 + 118)) -- rest 0.5 -- click
 
 # The file is written on a thread of its own and shown once it has landed,
 # which is when the title takes its name.
@@ -144,4 +149,8 @@ press 0
 sleep 2
 film=$(cut)
 close
-gif "$film" "export.gif" 800 "$started"
+shown=$(clip "$film" "export.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the dialog up over the ramp with
+# 25 just typed into the first size box and the other two following it.
+poster "$shown" "export_thumb.jpg" 15

@@ -5,13 +5,13 @@
 #
 # Only Hyprland is spoken here. Its Lua API places and focuses the window,
 # `wtype` types into it, and `grim` captures the region it reports. The capture
-# is in device pixels, so a monitor at scale 1.6 gives a 1200x800 window as a
-# 1920x1280 image, which is what the README's pictures are.
+# is in device pixels, so a monitor at scale 1.6 gives a 1200x675 window as a
+# 1920x1080 image, which is what the README's pictures are.
 #
 # A script sources this file, then:
 #
-#   open 1200 800 images/mora    the window, focused, with its first file shown
-#   keys plus plus plus Up       the keys to press, one argument each
+#   open 1200 675 images/mora    the window, focused, with its first file shown
+#   keys plus plus shift-Up      the keys to press, one argument each
 #   settle                       wait for a pan or zoom to land
 #   shoot main_screenshot.jpg    into $SCREENSHOTS
 #   close
@@ -19,10 +19,7 @@
 # or, for a recording, `record x.mp4` and `cut` around the keys, and
 # `clip "$film" x.mp4` afterwards, and `poster "$clip" x.jpg 9` for a still
 # to stand in for it. The recording is gpu-screen-recorder's, into $FILMS,
-# and the cut is ffmpeg's, into $SCREENSHOTS. `gif` puts the same cut out
-# as a GIF instead, which is what the scripts not yet moved over to MP4
-# still call. A GIF that flips between stills is
-# `still a.png`, `still b.png`, and `flipbook x.gif 2 "$a" "$b"`.
+# and the cut is ffmpeg's, into $SCREENSHOTS.
 #
 # Three things are the environment's to say, each with a default:
 #
@@ -60,7 +57,6 @@ cleanup() {
     [ -z "${RECORDER:-}" ] || kill -INT "$RECORDER" 2>/dev/null || true
     [ -z "${WINDOW:-}" ] || kill "$(window pid)" 2>/dev/null || true
     [ -z "${SPAWNED:-}" ] || kill $SPAWNED 2>/dev/null || true
-    [ -z "${RULE:-}" ] || hyprctl eval "hl.window_rule({ name = \"$RULE\", enabled = false })" >/dev/null
     [ -z "${POINTER_HIDDEN:-}" ] || hyprctl eval "hl.config({ cursor = { hide_on_key_press = $POINTER_HIDDEN } })" >/dev/null
 }
 trap cleanup EXIT
@@ -141,17 +137,11 @@ open() {
 # Start a command through the compositor with a rule set that floats its
 # window at W by H, at X, Y from the monitor's corner, at full opacity and
 # without a border, and return once a window of CLASS that was not there
-# before is on screen, in WINDOW. `open` is this for gamut, centered; a
-# script that wants another window beside gamut's — a terminal — calls it
-# for that window, with the position `placement` gives the two together.
-#
-#   spawn org.example.terminal 500 600 $X $Y "ghostty -e bash"
+# before is on screen, in WINDOW. `open` is this for gamut, centered.
 #
 # The window is started by the compositor, not by this script, so what it
 # runs is one line for the compositor's shell. The border goes because it
-# is drawn outside the window's rectangle, over whatever is next to it:
-# two windows flush against each other would each wear a stripe of the
-# other's.
+# is drawn outside the window's rectangle, over whatever is next to it.
 spawn() {
     before=$(windows "$1")
     hyprctl eval "hl.exec_cmd($(lua_quote "$6"), {
@@ -179,17 +169,6 @@ arrived() {
         sleep 0.1
     done
     [ -n "$WINDOW" ] || { echo "the $1 window never appeared" >&2; exit 1; }
-}
-
-# A window rule for the rest of the run, for a window the compositor will
-# open that `spawn` cannot hand its rules to: one that a shell in another
-# window starts. The argument is the rule's fields as Lua, its match
-# included; the rule is turned off when the script ends.
-#
-#   rule "match = { class = \"^$CLASS\$\" }, float = true, size = \"500 600\", move = { \"$X\", \"$Y\" }"
-rule() {
-    RULE=gamut-scripting-$$
-    hyprctl eval "hl.window_rule({ name = \"$RULE\", $1 })" >/dev/null
 }
 
 # What `record`, `shoot` and `still` capture: the window's rectangle,
@@ -235,6 +214,22 @@ sort_by() {
     mv "$state.new" "$state"
 }
 
+# One more of the things gamut keeps in its state file, by its key, set to
+# VALUE before `open`, for the same reason as `sort_by`: the program comes
+# up as it was last left.
+#
+#   remember loupe_magnification 4     the loupe at 4x when it is shown
+remember() {
+    state="${XDG_STATE_HOME:-$HOME/.local/state}/gamut/state"
+    mkdir -p "$(dirname "$state")"
+    [ -e "$state" ] || : > "$state"
+    awk -v key="$1" -v value="$2" '
+        $1 == key && $2 == "=" { print key " = " value; done = 1; next }
+        { print }
+        END { if (!done) print key " = " value }' "$state" >"$state.new"
+    mv "$state.new" "$state"
+}
+
 # Where on the focused monitor a W by H window goes, in logical pixels
 # from the monitor's corner: centered in what the bars leave, as the
 # `center` rule would put it, then moved to the nearest logical pixel that
@@ -242,13 +237,12 @@ sort_by() {
 #
 # On a monitor at scale 1.6 a logical pixel is 1.6 device pixels, and only
 # every fifth position lands on a whole one. Centered under a 26-pixel bar,
-# a 600-high window starts at device row 620.8, and both grim and the
+# a window can start at a device row like 620.8, and both grim and the
 # recorder then start their capture on row 620, which is not the window
 # but Hyprland's border around it: blue while the window has focus,
 # translucent gray while it does not, and half a second of fade between,
 # so it changes color every time the pointer goes out and comes back. The
-# recorder's is a full row of it, and the GIF, which builds its palette
-# from what changes between frames, makes that row flicker.
+# recorder's is a full row of it, and in a film that row flickers.
 placement() {
     hyprctl monitors -j | jq -r '.[] | select(.focused) |
         "\(.width) \(.height) \(.scale) \(.reserved | join(" "))"' |
@@ -349,15 +343,17 @@ keyboard() {
 # bars leave, at whichever of the two scales fits all of it in. LIST is
 # what the file list takes off the left of that area, where it is up;
 # without it the four bars are all that stands around the picture, which
-# is what every script that puts the list away wants.
+# is what every script that puts the list away wants. PANEL is what a side
+# panel takes off the right of it the same way, where one is open.
 #
 #   cursor $(fitted 6016 3384 960 2150)
 #   cursor $(fitted 4400 3760 2340 2260 163)   with the list down the left
+#   cursor $(fitted 5712 4284 700 3800 0 294)  with the info panel open
 fitted() {
-    set -- "$1" "$2" "$3" "$4" "${5:-0}" $(window geometry) $(scale)
-    awk -v W="$1" -v H="$2" -v X="$3" -v Y="$4" -v list="$5" \
-        -v wx="$6" -v wy="$7" -v ww="$8" -v wh="$9" -v scale="${10}" -v bar=30 'BEGIN {
-        vw = (ww - 2 * bar - list) * scale; vh = (wh - 2 * bar) * scale
+    set -- "$1" "$2" "$3" "$4" "${5:-0}" "${6:-0}" $(window geometry) $(scale)
+    awk -v W="$1" -v H="$2" -v X="$3" -v Y="$4" -v list="$5" -v panel="$6" \
+        -v wx="$7" -v wy="$8" -v ww="$9" -v wh="${10}" -v scale="${11}" -v bar=30 'BEGIN {
+        vw = (ww - 2 * bar - list - panel) * scale; vh = (wh - 2 * bar) * scale
         zoom = vw / W; if (vh / H < zoom) zoom = vh / H
         x = (vw - W * zoom) / 2 + X * zoom; y = (vh - H * zoom) / 2 + Y * zoom
         printf "%d %d\n", wx + bar + list + x / scale, wy + bar + y / scale
@@ -453,42 +449,6 @@ keys() {
     done
 }
 
-# Type a line of text at a shell prompt, a character at a time, through
-# the device's keyboard as one gesture: a terminal reads a capital as its
-# letter with Shift held, and the real keycodes under the real keymap are
-# what it wants — wtype's one-level keymap gives it the letter and no
-# shift, and it types the small one. The characters a command line is made
-# of are named here by where they are on a US layout.
-#
-#   text 'gamut --timing ~/Downloads/map.tif'
-text() {
-    keyboard
-    actions=$(printf '%s\n' "$1" | fold -w 1 | while IFS= read -r char; do
-        echo key
-        case $char in
-            [a-z0-9]) echo "$char" ;;
-            [A-Z]) echo "shift+$(printf '%s' "$char" | tr 'A-Z' 'a-z')" ;;
-            ' ') echo space ;;
-            -) echo minus ;;
-            _) echo shift+minus ;;
-            =) echo equal ;;
-            +) echo shift+equal ;;
-            .) echo dot ;;
-            ,) echo comma ;;
-            /) echo slash ;;
-            '~') echo shift+grave ;;
-            :) echo shift+semicolon ;;
-            "'") echo apostrophe ;;
-            '"') echo shift+apostrophe ;;
-            '*') echo shift+8 ;;
-            '$') echo shift+4 ;;
-            *) echo "text: no key for '$char'" >&2; exit 1 ;;
-        esac
-        echo --
-    done)
-    gesture ${actions%--}
-}
-
 # Hold a key down for SECONDS, named as `keys` names them: `hold Right 1`
 # for a pan that goes on as long as the key does.
 hold() {
@@ -571,26 +531,6 @@ cut() {
     echo "$RECORDING"
 }
 
-# The recording, or the part of it from START for LENGTH seconds, as a GIF
-# WIDTH pixels wide at 25 frames a second, under the name given in
-# $SCREENSHOTS: a palette for the whole clip first, then the frames dithered
-# against it.
-#
-#   gif "$film" out.gif [WIDTH] [START] [LENGTH]
-gif() {
-    film=$1
-    out=$SCREENSHOTS/$2
-    width=${3:-800}
-    window=""
-    [ -n "${4:-}" ] && window="-ss $4"
-    [ -n "${5:-}" ] && window="$window -t $5"
-    filters="fps=25,scale=$width:-1:flags=lanczos"
-    ffmpeg -v error -y $window -i "$film" \
-        -filter_complex "$filters,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
-        -loop 0 "$out"
-    echo "$out"
-}
-
 # The recording, or the part of it from START for LENGTH seconds, as an MP4
 # under the name given in $SCREENSHOTS, at the film's own size and frame
 # rate: 1920x1080 at 60, for a window opened 1200x675 on a monitor at scale
@@ -629,26 +569,13 @@ poster() {
 }
 
 # Capture the window's rectangle losslessly, as a PNG under the name given
-# in $FILMS: a frame for a GIF put together from stills rather than cut
-# from a recording. `flipbook` makes the GIF.
+# in $FILMS: a frame to measure a layout on, at the device's own pixels.
 still() {
     park
     set -- "$FILMS/$1" $(frame)
     mkdir -p "$FILMS"
     grim -g "$2,$3 ${4}x$5" "$1"
     echo "$1"
-}
-
-# The stills given, each held for HOLD seconds, as a GIF under the name
-# given in $SCREENSHOTS, at the stills' own size.
-#
-#   flipbook themes.gif 2 "$first" "$second"
-flipbook() {
-    out=$SCREENSHOTS/$1
-    hold=$2
-    shift 2
-    magick -delay "${hold}x1" -loop 0 "$@" "$out"
-    echo "$out"
 }
 
 # Close the window, and wait until the compositor has forgotten it: the next

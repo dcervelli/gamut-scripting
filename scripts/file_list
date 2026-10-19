@@ -1,17 +1,17 @@
 #!/bin/sh
 # The README's file list: the pictures of one mountain opened as their
-# directory in a 1000x600 window, the list down the left in name order.
-# The pointer goes to the button at its head, which opens the menu of
-# sorts; Area is chosen, and every row then wears the pixels it was sorted
-# on; the menu again, and Descending, which stands the biggest first and
-# takes the strip to its foot, the picture on screen being the smallest of
-# them. The wheel rolls the strip back to its head, where the three
+# directory in a 1200x675 window (16:9), the list down the left in name
+# order. The pointer goes to the button at its head, which opens the menu
+# of sorts; Area is chosen, and every row then wears the pixels it was
+# sorted on; the menu again, and Descending, which stands the biggest first
+# and takes the strip to its foot, the picture on screen being the smallest
+# of them. The wheel rolls the strip back to its head, where the three
 # rasters now stand, and the first is clicked: the elevation model, which
 # the wheel is then turned over the crater of. The third row is clicked
-# last — the shaded relief of the same ground, of a size with the model,
-# so it arrives at the zoom and the place the model was left at. The
-# pointer is in the film, since where it goes is the point, and it moves
-# as a hand would, through device.py.
+# last — the shaded relief of the same ground, of a size with the model, so
+# it arrives at the zoom and the place the model was left at. The pointer
+# is in the film, since where it goes is the point, and it moves as a hand
+# would, through device.py.
 #
 #   scripts/file_list                    on images/mora
 #   scripts/file_list DIR X Y            on another directory, the wheel over pixel
@@ -52,7 +52,10 @@ sizes=$(printf '%s\n' "$dir"/* | LC_ALL=C sort | while IFS= read -r path; do
     magick identify -format '%w %h\n' "$path[0]"
 done | awk '{ print $1 * $2, $1, $2 }' | sort -s -k1,1nr | awk '{ print $2, $3 }')
 
-open 1000 600 "$dir"
+# The film starts from name order, and gamut keeps the sort between runs:
+# this script's own last run leaves it by area, descending.
+sort_by name ascending
+open 1200 675 "$dir"
 set -- $(window geometry)
 wx=$1
 wy=$2
@@ -112,14 +115,22 @@ gesture wheel "$notches" 1.0 -- rest 0.8 \
 loaded
 sleep 1.2
 
-# Seven notches from a fit of 23% is 110%. The film ends back on the
+# Six notches from a fit of 26% is 100%. The film ends back on the
 # crater, off the row that was clicked: a row under the pointer says the
 # whole of its name beside the panel, over the picture.
 crater=$(fitted "$1" "$2" "$x" "$y" "$panel")
-gesture glide $crater -- rest 0.6 -- wheel 7 0.8 -- rest 1.5 \
+gesture glide $crater -- rest 0.6 -- wheel 6 0.8 -- rest 1.5 \
     -- glide $((wx + panel / 2)) $((wy + third_row)) -- rest 0.5 -- click -- rest 1.5 \
     -- glide $crater -- rest 1.2
 
 film=$(cut)
 close
-gif "$film" "file_list.gif" 800 "$started"
+shown=$(clip "$film" "file_list.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the list just sorted by area,
+# the menu closed and every row wearing its pixels. Cropped, still 16:9,
+# to the window's top left, so the list's head and its rows are larger in
+# the still and the summit stays in it.
+poster "$shown" "file_list_thumb.jpg" 4.4
+magick "$SCREENSHOTS/file_list_thumb.jpg" -crop 1440x810+0+0 +repage \
+    -quality 92 "$SCREENSHOTS/file_list_thumb.jpg"

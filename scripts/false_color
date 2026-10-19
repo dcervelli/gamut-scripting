@@ -1,8 +1,12 @@
 #!/bin/sh
-# The README's false color: the hillshade of the mountain in a 1000x600
-# window, zoomed to about 100% over the crater, and `r` pressed through the
-# four color maps — gray, viridis, magma, turbo — a second on each. The
-# zoom is done before the film starts; the film is the colors.
+# The README's false color: the hillshade of the mountain in a 1200x675
+# window (16:9), zoomed to 100% over the crater, the histogram opened from
+# its button, and the swatches under its Display band clicked through the
+# four color maps — gray, viridis, magma, turbo — a moment on each, then
+# the band's black handle dragged three tenths of the way in and its white
+# one a tenth.
+# The zoom is done before the film starts; the film is the colors, and the
+# pointer is in it, since where the colors are chosen is the point.
 #
 # The hillshade is opened alone rather than as one of its directory, which
 # holds other pictures of the mountain that would change which file the
@@ -18,23 +22,59 @@ file=${1:-$ROOT/images/mora/mora_hillshade_12.5m.tif}
 x=${2:-2340}
 y=${3:-2260}
 
-open 1000 600 "$file"
+open 1200 675 "$file"
 set -- $(magick identify -format '%w %h' "$file")
 cursor $(fitted "$1" "$2" "$x" "$y")
 sleep 0.3
-# Seven notches from a fit of 23% is 109%.
-wheel 7
+# Six notches from a fit of 26% is 100%.
+wheel 6
 settle
 
-record "false_color.mp4"
+record "false_color.mp4" cursor
 started=$(since_record)
-sleep 1
-keys r
-sleep 1
-keys r
-sleep 1
-keys r
-sleep 1
+sleep 0.3
+
+set -- $(window geometry)
+# The histogram toggle is the first button of the right strip: centered
+# across the strip, a bar's padding under the top bar.
+glide $(($1 + $3 - 15)) $(($2 + 45))
+sleep 0.2
+click
+sleep 0.5
+
+# The swatches stand in a row under the Display section's band, which is
+# 256 wide with its right end 54 in from the window's right edge: four of
+# 64 across it, gray first, their middles 278, 214, 150 and 86 in.
+swatch_y=$(($2 + 392))
+for in_from in 214 150 86; do
+    glide $(($1 + $3 - in_from)) "$swatch_y"
+    sleep 0.1
+    click
+    sleep 0.6
+done
+
+# Then the band's handles, which stand on its ends 358 down, dragged in
+# so that turbo is spread over the narrower window: the black three tenths
+# of its 256, since the band is in stops and a tenth at the dark end moves
+# the black point by next to nothing, and the white one tenth.
+band_y=$(($2 + 358))
+black_x=$(($1 + $3 - 310))
+white_x=$(($1 + $3 - 54))
+glide "$black_x" "$band_y"
+sleep 0.2
+drag_to $((black_x + 77)) "$band_y"
+sleep 0.5
+glide "$white_x" "$band_y"
+sleep 0.2
+drag_to $((white_x - 26)) "$band_y"
+sleep 0.3
+# Off the panel, so that the handle's tooltip goes and the swatches show.
+glide $(($1 + $3 / 3)) $(($2 + $4 * 2 / 3))
+sleep 0.8
 film=$(cut)
 close
-gif "$film" "false_color.gif" 800 "$started"
+shown=$(clip "$film" "false_color.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the last of the maps, turbo,
+# with the black and white points drawn in.
+poster "$shown" "false_color_thumb.jpg" 14.2

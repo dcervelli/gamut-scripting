@@ -30,7 +30,14 @@ A key from here is the real keycode, read under the real keymap.
                                the same held through every mark in turn, so that the
                                hand draws a curve and the window sees one stroke;
                                over S seconds, rather than at the pointer's own pace
+    device.py along [S] X Y X Y ...
+                               the pointer taken through every mark in turn with no
+                               button held, as one motion; over S seconds
     device.py click            the left button pressed and released
+    device.py hold_along [S] X Y X Y ...
+                               the right button held while the pointer is taken through
+                               every mark as `drag_along` takes it, still for a moment
+                               after the press and before the release; over S seconds
     device.py key CHORD        a key by its position, with modifiers: 2, shift+2, ctrl+shift+c
     device.py rest S [T]       nothing, for S seconds, or for somewhere between S and T:
                                a hand that pauses between two things
@@ -66,7 +73,7 @@ import time
 EV_SYN, EV_KEY, EV_REL = 0x00, 0x01, 0x02
 SYN_REPORT = 0
 REL_X, REL_Y, REL_WHEEL, REL_WHEEL_HI_RES = 0x00, 0x01, 0x08, 0x0B
-BTN_LEFT = 0x110
+BTN_LEFT, BTN_RIGHT = 0x110, 0x111
 
 # The keys a chord can name, by their evdev codes.
 KEYS = {
@@ -162,6 +169,7 @@ class Device:
         self.fd = os.open("/dev/uinput", os.O_WRONLY | os.O_NONBLOCK)
         fcntl.ioctl(self.fd, UI_SET_EVBIT, EV_KEY)
         fcntl.ioctl(self.fd, UI_SET_KEYBIT, BTN_LEFT)
+        fcntl.ioctl(self.fd, UI_SET_KEYBIT, BTN_RIGHT)
         for code in KEYS.values():
             fcntl.ioctl(self.fd, UI_SET_KEYBIT, code)
         fcntl.ioctl(self.fd, UI_SET_EVBIT, EV_REL)
@@ -276,8 +284,8 @@ class Device:
         x, y = said.split()[-2:]
         return float(x), float(y)
 
-    def button(self, down):
-        self.emit(EV_KEY, BTN_LEFT, 1 if down else 0)
+    def button(self, down, code=BTN_LEFT):
+        self.emit(EV_KEY, code, 1 if down else 0)
         self.sync()
         if not down:
             time.sleep(HEARD)
@@ -371,6 +379,17 @@ class Device:
         time.sleep(0.1)
         self.button(False)
 
+    def hold_along(self, marks, seconds=None):
+        # The right button held through a path rather than the left: what
+        # is held up while it is down, as gamut's loupe is, is seen standing
+        # before the pointer sets off and after it stops, so there is a
+        # moment still at each end. Not a drag, so there is no creep.
+        self.button(True, BTN_RIGHT)
+        time.sleep(0.5)
+        self.along(marks, seconds)
+        time.sleep(0.5)
+        self.button(False, BTN_RIGHT)
+
     def creep(self, x, y):
         # A toolkit takes a press for a click until the pointer has gone
         # some way from it — six logical pixels, for egui — and only then
@@ -454,6 +473,14 @@ def main(argv):
                     device.drag_along(pairs(marks))
                 case ["drag_along", seconds, *marks] if len(marks) >= 2 and len(marks) % 2 == 0:
                     device.drag_along(pairs(marks), float(seconds))
+                case ["along", *marks] if len(marks) >= 2 and len(marks) % 2 == 0:
+                    device.along(pairs(marks))
+                case ["along", seconds, *marks] if len(marks) >= 2 and len(marks) % 2 == 0:
+                    device.along(pairs(marks), float(seconds))
+                case ["hold_along", *marks] if len(marks) >= 2 and len(marks) % 2 == 0:
+                    device.hold_along(pairs(marks))
+                case ["hold_along", seconds, *marks] if len(marks) >= 2 and len(marks) % 2 == 0:
+                    device.hold_along(pairs(marks), float(seconds))
                 case ["click"]:
                     device.click()
                 case ["key", chord]:

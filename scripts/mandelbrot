@@ -1,7 +1,7 @@
 #!/bin/sh
 # The README's file watch: a program that renders the Mandelbrot set to a
-# PNG, zooming in a step every second, and a 1000x600 window open on that
-# PNG for ten seconds, taking each new frame as it lands. Three seconds in
+# PNG, zooming in a step every second, and a 1200x675 window (16:9) open
+# on that PNG for ten seconds, taking each new frame as it lands. Three seconds in
 # the window is zoomed four steps into the middle, where the renderer is
 # heading, and panned once around it, and each frame the renderer writes
 # meanwhile arrives under the same pan and zoom; then Space fits the whole
@@ -46,11 +46,11 @@ done
 [ -s "$png" ] || { echo "the renderer never wrote a frame" >&2; exit 1; }
 kill -STOP "$RENDERER"
 
-open 1000 600 "$png"
+open 1200 675 "$png"
 record "mandelbrot.mp4"
 kill -CONT "$RENDERER"
 sleep 3
-# Four steps of 1.25 from the fit of 84% is 205%. A step at a time, so
+# Four steps of 1.25 from the fit of 96% is 234%. A step at a time, so
 # that each zoom is seen to land.
 for _ in 1 2 3 4; do
     keys plus
@@ -58,7 +58,9 @@ for _ in 1 2 3 4; do
 done
 sleep 0.5
 # A turn around the middle, 64 image pixels a step, back to where it began.
-for key in Left Up Right Right Down Down Left Up; do
+# Shift: the arrows alone step through the files, and a lone file's step
+# reads its folder first.
+for key in shift-Left shift-Up shift-Right shift-Right shift-Down shift-Down shift-Left shift-Up; do
     keys "$key"
     sleep 0.3
 done
@@ -70,4 +72,8 @@ film=$(cut)
 close
 kill "$RENDERER"
 RENDERER=
-gif "$film" "mandelbrot.gif" 800
+shown=$(clip "$film" "mandelbrot.mp4")
+echo "$shown"
+# The still that stands in for the film: zoomed in on the seahorse
+# valley, the renderer's frames arriving under the zoom and the pan.
+poster "$shown" "mandelbrot_thumb.jpg" 5.4

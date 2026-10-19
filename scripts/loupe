@@ -1,17 +1,20 @@
 #!/bin/sh
-# The README's loupe: the first of the bird plates in a 1000x600 window,
+# The README's loupe: the first of the bird plates in a 1200x675 window,
 # the loupe's toggle in the bottom bar clicked, the pointer glided onto
 # the lower bird's eye, Shift+L pressed round the magnifications —
 # 4x, 8x, 16x, 2x and back to 4x — and then, the loupe still up, the
-# pointer glided down to the bird's foot and held there a second. Shift+L
+# pointer glided down to the bird's foot and held there a second; then the
+# toggle clicked off, and the loupe held up instead with the right button
+# over the upper bird's eye while the pointer goes round its head. Shift+L
 # goes through the device's keyboard, since wtype's capital reaches the
 # window as `l` and takes the loupe down. The pointer is in the film,
 # since the loupe sits beside it and the toggle is clicked.
 #
 #   scripts/loupe                  on images/birds
-#   scripts/loupe DIR X Y [FX FY]
+#   scripts/loupe DIR X Y [FX FY [UX UY]]
 #                      on another directory, the loupe over pixel X, Y of its
-#                      first file, then taken to FX, FY
+#                      first file, then taken to FX, FY, and held up with
+#                      the right button round UX, UY
 
 . "$(dirname "$0")/../lib.sh"
 
@@ -20,8 +23,16 @@ x=${2:-252}
 y=${3:-627}
 fx=${4:-425}
 fy=${5:-880}
+ux=${6:-525}
+uy=${7:-106}
 
-open 1000 600 "$dir"
+# The first file is whichever the sort gamut was last left with puts first,
+# so the sort is pinned to gamut's own default before the window opens.
+sort_by name ascending
+# The magnification is kept between runs too, and the four presses go
+# round from 4x back to it.
+remember loupe_magnification 4
+open 1200 675 "$dir"
 # The file list comes up down the left with a directory open; Tab puts it
 # away, so that the picture has the window and `fitted` finds it where the
 # four bars alone leave it.
@@ -33,10 +44,11 @@ keep_pointer
 record "loupe.mp4" cursor
 started=$(since_record)
 sleep 0.5
-# The loupe's toggle is second in the bottom bar, after the grid's: 45
+# The loupe's toggle is third in the bottom bar, after the grid's and the
+# horizon grid's: 22-wide buttons 8 apart from a padding of 4, so 75
 # pixels in from the left edge, on the bar's centerline.
 set -- "$1" "$2" $(window geometry)
-glide $(($3 + 45)) $(($4 + $6 - 15))
+glide $(($3 + 75)) $(($4 + $6 - 15))
 # Long enough on the button for its tooltip to come up and be read.
 sleep 1.0
 click
@@ -50,6 +62,27 @@ gesture key shift+l -- rest 0.3 -- key shift+l -- rest 0.3 -- key shift+l -- res
 sleep 1.0
 glide $(fitted "$1" "$2" "$fx" "$fy")
 sleep 1
+# The toggle again, to take the loupe down, and then the other way of
+# having it: over the upper bird's eye, the right button held, which holds
+# the loupe up for as long as it is down, and the pointer taken a little
+# way round the head — the beak, the crown, the eye again — before it is
+# let go.
+glide $(($3 + 75)) $(($4 + $6 - 15))
+sleep 0.4
+click
+sleep 0.6
+glide $(fitted "$1" "$2" "$ux" "$uy")
+sleep 0.4
+gesture hold_along 2.5 \
+    $(fitted "$1" "$2" $((ux - 45)) $((uy + 12))) \
+    $(fitted "$1" "$2" $((ux - 5)) $((uy - 30))) \
+    $(fitted "$1" "$2" $((ux + 40)) $((uy + 10))) \
+    $(fitted "$1" "$2" "$ux" "$uy")
+sleep 0.8
 film=$(cut)
 close
-gif "$film" "loupe.gif" 800 "$started"
+shown=$(clip "$film" "loupe.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the loupe at 4x over the lower
+# bird's eye, before Shift+L takes it round.
+poster "$shown" "loupe_thumb.jpg" 5

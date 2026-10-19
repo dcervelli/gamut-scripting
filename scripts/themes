@@ -1,47 +1,231 @@
 #!/bin/sh
-# The README's themes: a photograph in a 1000x600 window with the
-# information panel open, photographed on Tokyo Night, then again on
-# Gruvbox once the desk has been switched to it, and the two stills put
-# together as a GIF that flips between them every two seconds. The window
-# is not reopened between the two: gamut watches the desktop's theme and
-# retints itself when it changes. The desk is put back on whatever theme it
-# was on, however the script ends.
+# The README's themes: the showcase's last beat on its own. The whole of one
+# monitor is filmed, on an empty workspace where the desk's own background
+# stands behind the window, and Omarchy's theme menu retints the desk and the
+# window with it; then, under the new palette, Ctrl+P opens the relief map,
+# and the menu puts the desk back on the theme it opened on. The window is
+# not reopened: gamut watches the desktop's theme and retints itself when it
+# changes, and opening a picture in between shows a window that was themed
+# while it was being used rather than a screenshot taken twice.
 #
-#   scripts/themes                      on images/mora/mora.jpg
-#   scripts/themes FILE                 on another picture
-#   scripts/themes FILE A B             between themes A and B, named as `omarchy theme list` names them
+# The staging is the showcase's, for the showcase's reasons — see the head of
+# `scripts/showcase`. The monitor goes to scale 2, where the logical desktop
+# is exactly 1920x1080, so the 3840x2160 master comes down 2:1 to the
+# delivered film; the scale is pinned in HyprMon's file for the length of the
+# run, since setting a theme reloads the configuration and would otherwise
+# put the scale back mid-film. Workspace, scale, that file, the theme and
+# the background are all put back however the run ends.
+#
+#   scripts/themes                          on HDMI-A-1, workspace 4, to Lupine and back
+#   MONITOR=DP-2 scripts/themes             films the other monitor
+#   WORKSPACE=9 scripts/themes              on another empty workspace
+#   AWAY='Rose Pine' scripts/themes         swapping to another theme and back
 
 . "$(dirname "$0")/../lib.sh"
 
-file=${1:-$ROOT/images/mora/mora.jpg}
-first=${2:-Tokyo Night}
-second=${3:-Gruvbox}
+MONITOR=${MONITOR:-HDMI-A-1}
+WORKSPACE=${WORKSPACE:-4}
+AWAY=${AWAY:-Lupine}
 
-command -v omarchy-theme-set >/dev/null || { echo "omarchy-theme-set is not installed" >&2; exit 1; }
+# A whole 4K frame rather than the fraction of one a window film is: hevc
+# holds the quality at a size worth keeping, and the delivery is h264.
+CODEC=${CODEC:-hevc}
+QUALITY=${QUALITY:-ultra}
 
-# Put the desk on the theme named, unless it is there already. Names are
-# compared as Omarchy stores them, lowercase and dashed.
-theme() {
-    name=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-    [ "$(cat "$HOME/.local/state/omarchy/current/theme.name")" = "$name" ] && return
-    omarchy-theme-set "$1" >/dev/null
-    # The change reaches the window through a watch that fires once the
-    # palette file has held still for a while; the frame after that is
-    # what is wanted.
-    sleep 1
+# The showcase's window: 1400 across leaves 260 of background either side
+# of it on the 1920-wide desk, and 843 high leaves better than a hundred
+# over and under it.
+WIDTH=1400
+HEIGHT=843
+
+for tool in omarchy-menu omarchy-theme-set omarchy-theme-current omarchy-theme-bg-set; do
+    command -v "$tool" >/dev/null || { echo "$tool is not installed" >&2; exit 1; }
+done
+
+# One field of the monitor being filmed: a number by name, or `frame` for its
+# rectangle in logical pixels, which is what `record` captures.
+output() {
+    hyprctl monitors -j | jq -r --arg name "$MONITOR" "
+        .[] | select(.name == \$name) | $(case $1 in
+            frame) echo '"\(.x) \(.y) \(.width / .scale | floor) \(.height / .scale | floor)"' ;;
+            *) echo ".$1" ;;
+        esac)"
 }
 
-was=$(omarchy-theme-current)
+# Put the monitor being filmed on SCALE, and wait until it is there. Through
+# the Lua API, since `hyprctl keyword monitor` is refused under a Lua
+# configuration and says nothing; read back rather than trusted.
+scaled() {
+    hyprctl eval "hl.monitor({ output = \"$MONITOR\", mode = \"$MODE\",
+        position = \"auto\", scale = $1 })" >/dev/null
+    for _ in $(seq 100); do
+        [ "$(output scale)" = "$1" ] && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+# Pin the scale in the file a reload reads, and put the file back after:
+# setting a theme reloads the configuration, which puts back everything set
+# at runtime, and HyprMon's file is the last thing it reads.
+HYPRMON=$HOME/.config/hypr/hyprmon.lua
+HYPRMON_SAVED=
+pinned() {
+    [ -f "$HYPRMON" ] || return 0
+    HYPRMON_SAVED=$FILMS/hyprmon.lua.themes
+    mkdir -p "$FILMS"
+    cp "$HYPRMON" "$HYPRMON_SAVED"
+    awk -v name="$MONITOR" -v scale="$1" '
+        index($0, "output = \"" name "\"") { sub(/scale = [0-9.]+/, "scale = " scale) }
+        { print }' "$HYPRMON_SAVED" > "$HYPRMON"
+}
+
+unpinned() {
+    [ -n "$HYPRMON_SAVED" ] || return 0
+    cp "$HYPRMON_SAVED" "$HYPRMON"
+    rm -f "$HYPRMON_SAVED"
+    HYPRMON_SAVED=
+}
+
+# What a reload puts back that the film wants kept: the pointer on screen
+# while keys are pressed, and the scale, in case there was no file to pin it
+# in.
+reasserted() {
+    hyprctl eval 'hl.config({ cursor = { hide_on_key_press = false } })' >/dev/null
+    [ "$(output scale)" = "2" ] || scaled 2 || true
+}
+
+# Show a workspace on the monitor being filmed. Omarchy's rules pin 1 to 5
+# to the first monitor, so WORKSPACE has to be one of the monitor's own, and
+# empty, or the film has someone else's windows in it.
+showing() {
+    hyprctl eval "hl.dispatch(hl.dsp.focus({ workspace = \"$1\" }))" >/dev/null
+    sleep 0.4
+}
+
+WAS_SCALE=
+WAS_WORKSPACE=
+WAS_THEME=
+WAS_BACKGROUND=
 restore() {
-    theme "$was"
+    [ -z "$WAS_THEME" ] || [ "$(omarchy-theme-current)" = "$WAS_THEME" ] ||
+        omarchy-theme-set "$WAS_THEME" >/dev/null 2>&1 || true
+    # Setting a theme puts the desk on that theme's first background,
+    # whichever of them it was on before, so coming back to the theme is
+    # not coming back to the desk. The background is named by its file
+    # rather than its path: the path is into the current theme's directory,
+    # which the swap away replaced.
+    backgrounds=$HOME/.local/state/omarchy/current/theme/backgrounds
+    [ -z "$WAS_BACKGROUND" ] || [ ! -f "$backgrounds/$WAS_BACKGROUND" ] ||
+        omarchy-theme-bg-set "$backgrounds/$WAS_BACKGROUND" >/dev/null 2>&1 || true
+    [ -z "$WAS_SCALE" ] || scaled "$WAS_SCALE" ||
+        echo "$MONITOR is still at scale $(output scale); put it back with" \
+             "hyprctl eval 'hl.monitor({ output = \"$MONITOR\", mode = \"$MODE\"," \
+             "position = \"auto\", scale = $WAS_SCALE })'" >&2
+    [ -z "$WAS_WORKSPACE" ] || showing "$WAS_WORKSPACE"
+    unpinned
     cleanup
 }
 trap restore EXIT
 
-theme "$first"
-open 1000 600 --info "$file"
-a=$(still "themes-1.png")
-theme "$second"
-b=$(still "themes-2.png")
+# Keys for the menu rather than the window: `keys` would put the pointer
+# back in the window first, which is what would take the menu down.
+menu_keys() {
+    for key; do
+        wtype -k "$key"
+        sleep "${PACE:-0.12}"
+    done
+}
+
+# The first four letters of a theme's name, one per line, as the keys that
+# narrow the menu to it.
+letters() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z' | fold -w 1 | head -4
+}
+
+# Omarchy's own theme menu, summoned by the command its binding runs. The
+# theme reaches the window through a watch on the palette file, a second or
+# so behind the menu.
+swap() {
+    omarchy-menu summon style.theme >/dev/null 2>&1 &
+    sleep 1.5
+    menu_keys "$@"
+    sleep 0.6
+    menu_keys Return
+    sleep 1.5
+    reasserted
+    sleep 1
+}
+
+# Wait for a step to another file to arrive: the title says "loading" until
+# the picture is up, but not in the same breath as the key.
+stepped() {
+    sleep 0.3
+    loaded
+}
+
+MODE=$(hyprctl monitors -j | jq -r --arg n "$MONITOR" \
+    '.[] | select(.name == $n) | "\(.width)x\(.height)@\(.refreshRate * 100 | round / 100)"')
+[ -n "$MODE" ] || { echo "there is no monitor called $MONITOR" >&2; exit 1; }
+
+WAS_THEME=$(omarchy-theme-current)
+WAS_BACKGROUND=$(basename "$(readlink -f "$HOME/.local/state/omarchy/current/background")")
+WAS_WORKSPACE=$(output activeWorkspace.name)
+WAS_SCALE=$(output scale)
+
+# The film opens on the background the theme comes back to: setting a
+# theme puts the desk on its first one, so the switch back at the end lands
+# on 0-winding-road.jpg whatever the desk was on, and opening there too
+# makes the film end where it began. The desk's own is put back by
+# `restore`.
+opening=$HOME/.local/state/omarchy/current/theme/backgrounds/0-winding-road.jpg
+[ -f "$opening" ] && omarchy-theme-bg-set "$opening" >/dev/null 2>&1
+
+showing "$WORKSPACE"
+pinned 2
+scaled 2 || { echo "$MONITOR would not go to scale 2" >&2; exit 1; }
+
+# The pointer onto the filmed monitor before anything opens: the window goes
+# to the focused monitor, and focus follows the pointer.
+set -- $(output frame)
+warp $(($1 + $3 / 2)) $(($2 + $4 / 2))
+sleep 0.5
+
+# The mountain's directory, the list down the left and the information
+# panel down the right, on the photograph, which name order puts first.
+sort_by name ascending
+open "$WIDTH" "$HEIGHT" --info "$ROOT/images/mora"
+keep_pointer
+
+FRAME=$(output frame)
+record "themes.mp4" cursor
+started=$(since_record)
+sleep 0.75
+
+swap $(letters "$AWAY")
+
+press ctrl+p
+sleep 0.5
+PACE=0.18
+keys r e l i e f
+unset PACE
+sleep 0.4
+keys Return
+stepped
+sleep 1
+
+swap $(letters "$WAS_THEME")
+sleep 1.25
+film=$(cut)
 close
-flipbook "themes.gif" 2 "$a" "$b"
+
+# The master down 2:1 to the delivery: `flags=area` is a box average, the
+# right supersample at this ratio, and will not ring on a one-pixel border
+# or on text the way lanczos can.
+ffmpeg -v error -y -ss "$started" -i "$film" -vf scale=1920:1080:flags=area \
+    -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart \
+    -an "$SCREENSHOTS/themes.mp4"
+echo "$SCREENSHOTS/themes.mp4"
+# The still that stands in for the film: the relief map just arrived in the
+# window under Lupine, the desk's new background behind it.
+poster "$SCREENSHOTS/themes.mp4" "themes_thumb.jpg" 9.5
