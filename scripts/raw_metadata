@@ -1,0 +1,122 @@
+#!/bin/sh
+# The information panel's Raw Data tab: a phone's photo in a 1200x675
+# window (16:9), the information toggle in the right strip clicked and the
+# panel's Raw Data tab chosen. HDR typed into its filter and the Apple HDR
+# Headroom hit clicked, which puts the query away and shows the tag where it
+# is in the tree, deep in MakerNotes; the column wheeled back up until
+# MakerNotes' heading is on screen, and the fold button at the end of the
+# count line pressed twice, to open every group and then fold them all.
+# Then GPS typed into the filter, and the tags it leaves copied from the
+# Copy menu as JSON. Last, a terminal brought up
+# over the right two thirds of the frame and `wl-paste | nvim -` typed into
+# it and run, so that the copy is seen to be JSON.
+#
+# The pointer is in the film, since where it goes is the point, and it
+# moves as a hand would, through device.py.
+#
+#   scripts/raw_metadata                  on images/wichita.heic
+
+. "$(dirname "$0")/../lib.sh"
+
+file=$ROOT/images/wichita.heic
+TERMINAL_CLASS=com.dcervelli.gamut-terminal
+WIDTH=1200
+HEIGHT=675
+
+open "$WIDTH" "$HEIGHT" "$file"
+keep_pointer
+GAMUT_WINDOW=$WINDOW
+set -- $(window geometry)
+wx=$1
+wy=$2
+ww=$3
+wh=$4
+# Where the window was placed from the monitor's corner, as `spawn` takes
+# it, for the terminal to be placed beside it the same way.
+set -- $(placement "$WIDTH" "$HEIGHT")
+px=$1
+py=$2
+
+# Capitals typed by their keys' positions, since wtype's shift leaves a
+# letter as it is in the filter: one device for the word, as one hand
+# types it, rather than one a letter, which is a pause between each.
+capitals() {
+    keyboard
+    words=
+    for letter; do
+        words="$words key shift+$letter -- rest 0.06 --"
+    done
+    gesture ${words% --}
+}
+
+# Each step one gesture, the device made once for its glide and click: a
+# device of its own for each is a pause of its making between them.
+point() {
+    gesture glide "$1" "$2" -- rest 0.15 -- click
+}
+
+record "raw_metadata.mp4" cursor
+started=$(since_record)
+sleep 0.4
+
+# The information toggle is the second button of the right strip.
+point $((wx + ww - 15)) $((wy + 75))
+sleep 0.5
+# The tabs stand at the head of the panel, Raw Data the second.
+point $((wx + ww - 230)) $((wy + 51))
+sleep 0.6
+
+# The filter is the field under the tabs; it has the keyboard only once it
+# is clicked.
+point $((wx + ww - 177)) $((wy + 86))
+capitals h d r
+sleep 0.8
+# Apple · HDR Headroom is the third hit; long enough after it to see the
+# tag in the tree.
+point $((wx + ww - 200)) $((wy + 218))
+sleep 1.0
+
+# Back up the tree, slowly enough to see what goes past: six notches
+# bring MakerNotes' heading on screen.
+gesture glide $((wx + ww - 200)) $((wy + 400)) -- wheel 6 1.5
+sleep 0.4
+# The fold button, at the right end of the count line. It says Collapse
+# all only while every group is open, and the hit opened MakerNotes alone,
+# so it is pressed twice: Expand all, and then Collapse all.
+point $((wx + ww - 51)) $((wy + 115))
+sleep 0.6
+click
+sleep 0.6
+
+point $((wx + ww - 177)) $((wy + 86))
+capitals g p s
+sleep 0.8
+# Copy opens its menu, and JSON is its third item.
+point $((wx + ww - 71)) $((wy + 51))
+sleep 0.3
+point $((wx + ww - 84)) $((wy + 139))
+sleep 0.8
+
+# The terminal over the right two thirds of the frame: 800 is a whole
+# number of device pixels at scale 1.6, as 1200 is. A process of its own
+# under a class of its own, so that it is told from the desk's terminals.
+spawn "$TERMINAL_CLASS" 800 "$HEIGHT" $((px + 400)) "$py" \
+    "ghostty --class=$TERMINAL_CLASS --gtk-single-instance=false"
+# Long enough for the shell's prompt.
+sleep 0.8
+set -- $(window geometry)
+glide $(($1 + $3 / 2)) $(($2 + $4 / 2))
+PACE=0.04 keys w l minus p a s t e space bar space n v i m space minus
+sleep 0.4
+keys Return
+sleep 2.5
+film=$(cut)
+close
+WINDOW=$GAMUT_WINDOW
+close
+shown=$(clip "$film" "raw_metadata.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the JSON in the editor, gamut's
+# picture beside it.
+length=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$shown")
+poster "$shown" "raw_metadata_thumb.jpg" "$(awk -v l="$length" 'BEGIN { print l - 0.5 }')"

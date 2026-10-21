@@ -1,0 +1,106 @@
+#!/bin/sh
+# The histogram on an Apple ProRAW: the DNG in a 1200x675 window (16:9),
+# the histogram button in the right strip pressed and its column wheeled
+# down to the foot, Develop and Image, and the pointer taken over the
+# bright water at the lower right and then into a dark patch at the upper
+# left, so that where each pixel stands is marked on every plot. The
+# column wheeled back up until Develop's heading is just showing at its
+# foot, with Profile above it, and the same two places pointed at again;
+# the column wheeled back to its head, the Profile's button pressed to
+# take the profile off, and the two again. Then the bottom bar's RAW
+# switch pressed for the camera's JPEG, again for the raw, the profile put
+# back on, and the JPEG once more.
+#
+# The pointer is in the film, since where it goes is the point, and it
+# moves as a hand would, through device.py.
+#
+#   scripts/proraw_histogram        on images/ProRAW.DNG
+
+. "$(dirname "$0")/../lib.sh"
+
+file=$ROOT/images/ProRAW.DNG
+
+# All kept between runs: the raw developed rather than the JPEG inside it,
+# the profile on, and the bottom bar's readout of the pixel under the
+# pointer as the values it is mapped to.
+remember camera_jpeg false
+remember profile true
+remember pixel_format mapped
+open 1200 675 "$file"
+keep_pointer
+set -- $(window geometry)
+wx=$1
+wy=$2
+ww=$3
+wh=$4
+
+# The 4032x3024 picture fitted with the panel open: 984 device pixels high,
+# 1312 across, from 69, 48 in the window's device pixels.
+at() {
+    awk -v wx="$wx" -v wy="$wy" -v x="$1" -v y="$2" 'BEGIN {
+        s = 984 / 3024
+        printf "%.2f %.2f\n", wx + (69 + x * s) / 1.6, wy + (48 + y * s) / 1.6
+    }'
+}
+bright=$(at 3826 2864)
+dark=$(at 725 689)
+
+# The two places in turn, each held long enough to read its marks.
+both() {
+    gesture glide $bright -- rest 1.5 -- glide $dark -- rest 1.5
+}
+
+# A glide and a click as one gesture.
+point() {
+    gesture glide "$1" "$2" -- rest 0.15 -- click
+}
+
+record "proraw_histogram.mp4" cursor
+started=$(since_record)
+sleep 0.4
+
+# The histogram toggle is the first button of the right strip.
+point $((wx + ww - 15)) $((wy + 45))
+sleep 0.6
+# Down to the foot: eight notches, slowly enough to see what goes past.
+gesture glide $((wx + ww - 200)) $((wy + 300)) -- wheel -8 2
+sleep 0.5
+both
+
+# Three notches back up leave Develop's heading at the foot.
+gesture glide $((wx + ww - 200)) $((wy + 300)) -- wheel 3 0.8
+sleep 0.5
+both
+
+# Back to the head of the column: five notches, and a sixth to be sure of
+# it. Profile's heading, and its button, the camera at the right end of
+# it, are then 457 down.
+gesture glide $((wx + ww - 200)) $((wy + 300)) -- wheel 6 1.2
+sleep 0.5
+point $((wx + ww - 61)) $((wy + 457))
+sleep 0.6
+both
+
+# The RAW switch in the bottom bar, between the rotations and the HDR
+# brightness: the camera's JPEG, and back.
+switch=$((wx + ww - 128))
+bar=$((wy + wh - 15))
+point "$switch" "$bar"
+sleep 1.2
+point "$switch" "$bar"
+sleep 1.2
+# The raw comes back with the column at its head, where it was left.
+point $((wx + ww - 61)) $((wy + 457))
+sleep 1.2
+point "$switch" "$bar"
+sleep 1.5
+film=$(cut)
+close
+shown=$(clip "$film" "proraw_histogram.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film, at 15.883 s.
+poster "$shown" "proraw_histogram_thumb.jpg" 15.883
+# Cropped, still 16:9, a tenth off the top and the bottom and kept to the
+# right edge, so that the panel is larger in the still.
+magick "$SCREENSHOTS/proraw_histogram_thumb.jpg" -crop 1536x864+384+108 +repage \
+    -quality 92 "$SCREENSHOTS/proraw_histogram_thumb.jpg"

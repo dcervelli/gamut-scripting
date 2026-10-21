@@ -1,0 +1,168 @@
+#!/bin/sh
+# Open in map: an empty browser and gamut on a phone's photo side by side,
+# so that the map the Location section's button asks for is seen to come
+# up beside the picture it was asked from. The two share one 1200x675
+# frame (16:9) half and half, the browser on the left and gamut on the
+# right, on an empty workspace, where nothing else of the desk's comes into
+# the picture.
+#
+# The browser is Chromium, started as a process of its own, on a profile
+# of its own and under a class of its own: a profile the script makes
+# under $FILMS each run, so that the window is empty — no bookmarks, no
+# tabs from last time, nobody signed in — and a class so that its window
+# is told from any other Chromium's. The button goes through xdg-open to
+# the desk's default browser, so for the length of the run the default is
+# this one: a desktop entry of the script's own, which starts Chromium on
+# the same profile and so hands the address to the window already up.
+# The desk's own mimeapps.list is copied aside first and put back however
+# the run ends, so its default browser is what it was.
+#
+# The film is the frame, from the moment the two windows are up: the
+# information toggle in gamut's right strip clicked, the column wheeled
+# down to Location, and its map button clicked, the map coming up in the
+# browser on the left.
+#
+#   scripts/open_in_map                  on HDMI-A-1, workspace 4
+#   WORKSPACE=9 scripts/open_in_map      on another empty workspace
+#   scripts/open_in_map FILE             on another file with a location
+
+. "$(dirname "$0")/../lib.sh"
+
+command -v chromium >/dev/null || { echo "chromium is not installed" >&2; exit 1; }
+
+file=${1:-$ROOT/images/wichita.heic}
+WORKSPACE=${WORKSPACE:-4}
+BROWSER_CLASS=com.dcervelli.gamut-open-in-map
+DIR=$FILMS/open_in_map
+PROFILE=$DIR/profile
+APPLICATIONS=${XDG_DATA_HOME:-$HOME/.local/share}/applications
+ENTRY=$BROWSER_CLASS.desktop
+MIMEAPPS=${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list
+
+# The frame, and how it is shared.
+WIDTH=1200
+HEIGHT=675
+SPLIT=$((WIDTH / 2))
+
+# However the script ends, the desk's default browser is put back as it
+# was, from the copy, and the script's desktop entry goes. A desk that had
+# no mimeapps.list is left without one.
+restore() {
+    if [ -f "$DIR/mimeapps.list" ]; then
+        cp -- "$DIR/mimeapps.list" "$MIMEAPPS"
+    elif [ -n "${NO_MIMEAPPS:-}" ]; then
+        rm -f -- "$MIMEAPPS"
+    fi
+    rm -f -- "$APPLICATIONS/$ENTRY"
+    # Every Chromium on the script's profile, the one xdg-open started to
+    # hand the address over as well as the window's own.
+    pkill -f -- "--class=$BROWSER_CLASS" 2>/dev/null || true
+    cleanup
+}
+trap restore EXIT
+
+hyprctl eval "hl.dispatch(hl.dsp.focus({ workspace = \"$WORKSPACE\" }))" >/dev/null
+sleep 0.4
+
+rm -rf -- "$DIR"
+mkdir -p -- "$PROFILE/Default" "$APPLICATIONS"
+# Pages at two thirds of their size: the map gamut asks for by default is
+# geojson.io's, which in a window half the frame wide puts its map away
+# and shows only the GeoJSON beside it, and at two thirds the same window
+# is wide enough to the page for both. Chromium keeps its zoom as a power
+# of 1.2, and -2.2239 is 1.2's power that is 0.6667.
+printf '%s\n' '{"partition":{"default_zoom_level":{"x":-2.2239}}}' >"$PROFILE/Default/Preferences"
+
+# The default browser, for the run: xdg-settings refuses while BROWSER is
+# set, as Omarchy sets it, though xdg-open asks the desktop entries first
+# and BROWSER only where they have no answer.
+if [ -f "$MIMEAPPS" ]; then
+    cp -- "$MIMEAPPS" "$DIR/mimeapps.list"
+else
+    NO_MIMEAPPS=yes
+fi
+# The profile has to be the same directory to the compositor's shell and
+# to xdg-open, or the address goes to a second Chromium rather than to the
+# window already up. xdg-open splits the entry's Exec line at its spaces
+# and takes any quotes in it as part of the words, so the path goes in
+# bare, and a path with a space in it cannot be said there at all.
+case $PROFILE in
+    *[[:space:]]*) echo "the profile's path has a space in it: $PROFILE; set FILMS" >&2; exit 1 ;;
+esac
+flags="--class=$BROWSER_CLASS --no-first-run --no-default-browser-check"
+browser="chromium --user-data-dir=$(shell_quote "$PROFILE") $flags"
+cat >"$APPLICATIONS/$ENTRY" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Chromium
+Exec=chromium --user-data-dir=$PROFILE $flags %U
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;
+NoDisplay=true
+EOF
+env -u BROWSER xdg-settings set default-web-browser "$ENTRY"
+
+# Placed as one window the frame's size would be, and then split: 600
+# logical pixels is a whole number of device pixels at scale 1.6, so the
+# edge between the two is as aligned as the frame's. The placement is from
+# the monitor's corner, as the rules take it; the frame is in the layout,
+# as the capture takes it, so it is moved by where the monitor stands there.
+set -- $(placement "$WIDTH" "$HEIGHT") \
+    $(hyprctl monitors -j | jq -r '.[] | select(.focused) | "\(.x) \(.y)"')
+x=$1
+y=$2
+FRAME="$(($3 + x)) $(($4 + y)) $WIDTH $HEIGHT"
+
+# The browser first, on a blank page; gamut second, for `loaded` to watch
+# its title, and the window the rest of the script is about.
+handsoff
+spawn "$BROWSER_CLASS" "$SPLIT" "$HEIGHT" "$x" "$y" "$browser --new-window about:blank"
+# A new profile is a while making, and the window is up before it has
+# drawn anything: what is behind it shows through until the blank page is
+# in its title.
+for _ in $(seq 100); do
+    case "$(window title)" in about:blank*) break ;; *) sleep 0.1 ;; esac
+done
+sleep 1.5
+spawn "$CLASS" $((WIDTH - SPLIT)) "$HEIGHT" $((x + SPLIT)) "$y" \
+    "env${ENVIRONMENT:-} $GAMUT --size $((WIDTH - SPLIT)) $HEIGHT $(shell_quote "$file")"
+loaded
+keep_pointer
+set -- $(window geometry)
+wx=$1
+wy=$2
+ww=$3
+wh=$4
+cursor $((wx + ww / 2)) $((wy + 15))
+sleep 1
+
+record "open_in_map.mp4" cursor
+started=$(since_record)
+# The two on their own before anything is pointed at.
+sleep 1.5
+
+# The information toggle is the second button of the right strip, as in
+# curated_info.
+gesture glide $((wx + ww - 15)) $((wy + 75)) -- rest 0.8 -- click
+sleep 1.2
+
+# The column wheeled down until Location is about halfway up it, with the
+# pointer over the panel.
+gesture glide $((wx + ww - 200)) $((wy + 300)) -- rest 0.4
+wheel -3 1.5
+sleep 1.0
+
+# The map button, at the end of the Location section's coordinates, which
+# three notches leave 244 down from the window's top and 125 in from its
+# right edge.
+gesture glide $((wx + ww - 125)) $((wy + 244)) -- rest 0.8 -- click
+# Long enough for the map to load and be looked at.
+sleep 5
+
+film=$(cut)
+close
+shown=$(clip "$film" "open_in_map.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: its last moments, the map up on
+# the left and the panel's Location on the right.
+length=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$shown")
+poster "$shown" "open_in_map_thumb.jpg" "$(awk -v l="$length" 'BEGIN { print l - 0.5 }')"

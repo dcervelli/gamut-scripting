@@ -1,9 +1,25 @@
 #!/bin/sh
-# Every picture, one script after another in the order the README lists
-# them, each on its own defaults: for after the interface changes, when
-# they all want taking again. Stops at the first that fails, and says
+# Every picture and every film, one script after another, each on its own
+# defaults: for after the interface changes, when they all want taking
+# again. The order is the README's, with each film standing next to the
+# picture it is of — the raw histograms after the photograph's, the map
+# beside the button that asks for it. Stops at the first that fails, and says
 # which. GAMUT, SCREENSHOTS and FILMS pass through to each. Keep your hands
 # off the keyboard for the whole run, as for any one of them.
+#
+# Every script beside this one is either in the list or held back by name in
+# the one under it, which is the whole of what is not run here and says why
+# for each. showcase is held: it films the whole monitor rather than the
+# window, from a terminal on the other one, and is a run of its own.
+#
+# A few of the rest do more than open a window, and each puts back what it
+# changed however it ends: open_in_map makes this desk's default browser its
+# own for the length of its run, live_reload and raw_metadata bring up a
+# terminal of their own, and histogram_hdr puts the monitor into HDR.
+#
+# The list is the order, and the check under it is what keeps the two lists
+# from falling behind the directory: a script written beside this one and in
+# neither stops the run before anything is taken.
 #
 #   scripts/all
 
@@ -11,8 +27,27 @@ set -eu
 
 SCRIPTS=$(cd "$(dirname "$0")" && pwd)
 
-for script in main_screenshot animated pixel_grid pixel_copy open_in curated_info compare \
-    false_color fuzzy_finder file_list themes histogram histogram_raw mandelbrot ui region export loupe horizon_grid; do
+ALL="main_screenshot animated pixel_grid pixel_copy open_in open_in_map
+    curated_info raw_metadata compare false_color fuzzy_finder file_list
+    live_reload themes histogram histogram_raw histogram_hdr
+    proraw_histogram data_histogram gain_maps depth_maps horizon_grid
+    mandelbrot ui region export loupe"
+
+# Held back, and why. A script here is run by hand rather than by this one.
+HELD="showcase"       # films the whole desk; wants the other monitor
+
+LIST=" $(printf '%s ' $ALL $HELD)"
+
+for path in "$SCRIPTS"/*; do
+    name=${path##*/}
+    if [ "$name" = all ]; then continue; fi
+    case $LIST in
+        *" $name "*) ;;
+        *) echo "$name is beside all and in neither its list nor its held ones" >&2; exit 1;;
+    esac
+done
+
+for script in $ALL; do
     echo "== $script"
     "$SCRIPTS/$script" || { echo "$script failed" >&2; exit 1; }
 done

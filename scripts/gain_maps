@@ -1,0 +1,112 @@
+#!/bin/sh
+# Gain maps: three pictures that carry one — a phone's HEIC, a JPEG and an
+# Apple ProRAW — opened together in a 1200x675 window (16:9), sorted by
+# size so that they stand in that order, the HEIC first. The information
+# toggle in the right strip clicked and its column wheeled to the foot,
+# where the Gain Map section is; then the histogram toggle, and the gain
+# map's button in the bottom bar, and the pointer taken into a dark patch
+# of trees and up into the sky. The JPEG chosen from the file list, the
+# pointer moved a little about its sky and then its dark windows, and the
+# gain map turned off; the ProRAW chosen, the gain map turned back on, and
+# the pointer taken into the dark of its lower right and then onto green.
+#
+# The pointer is in the film, since where it goes is the point, and it
+# moves as a hand would, through device.py.
+#
+#   scripts/gain_maps        on images/curated_info.heic, NYC.jpg, ProRAW.DNG
+
+. "$(dirname "$0")/../lib.sh"
+
+I=$ROOT/images
+
+# Smallest first: curated_info.heic, NYC.jpg, ProRAW.DNG. The raw developed
+# rather than the JPEG inside it, and the readout as the values the pixel
+# is mapped to.
+sort_by size ascending
+remember camera_jpeg false
+remember pixel_format mapped
+open 1200 675 "$I/curated_info.heic" "$I/NYC.jpg" "$I/ProRAW.DNG"
+keep_pointer
+set -- $(window geometry)
+wx=$1
+wy=$2
+ww=$3
+wh=$4
+
+# Where pixel X, Y of a W by H picture is, with the file list down the left
+# and a panel open down the right.
+pixel() {
+    fitted "$1" "$2" "$3" "$4" 162.5 292.5
+}
+
+# A glide and a click as one gesture.
+point() {
+    gesture glide "$1" "$2" -- rest 0.15 -- click
+}
+
+# A small turn about a point, for the readout and the marks to follow.
+about() {
+    set -- "$1" "$2"
+    gesture glide "$1" "$2" -- along 1.2 $(($1 + 12)) $(($2 - 8)) $(($1 + 20)) $(($2 + 6)) \
+        $(($1 + 6)) $(($2 + 14)) $(($1 - 6)) $(($2 + 4)) "$1" "$2"
+}
+
+# The gain map's button in the bottom bar, the sun, second from its right
+# end; and the file list's entries, by their names.
+sun_x=$((wx + ww - 69))
+bar_y=$((wy + wh - 15))
+list_x=$((wx + 60))
+
+record "gain_maps.mp4" cursor
+started=$(since_record)
+sleep 0.4
+
+# The information toggle is the second button of the right strip.
+point $((wx + ww - 15)) $((wy + 75))
+sleep 0.6
+# Down to the foot, slowly enough to see what goes past, to Gain Map, with
+# the pointer on the column's scroll bar, 43 in from the window's right
+# edge: over the column itself it would stand on each section as it went
+# by, and Orientation, under a pointer, draws its horizon over the picture.
+gesture glide $((wx + ww - 43)) $((wy + 300)) -- wheel -8 2
+sleep 1.5
+# The histogram toggle, the first button of the strip.
+point $((wx + ww - 15)) $((wy + 45))
+sleep 0.8
+# The button shows the gain map in the picture's place, at its own
+# 2016x1512, and the two places are pixels of it.
+point "$sun_x" "$bar_y"
+sleep 1.0
+set -- $(pixel 2016 1512 432 1399) $(pixel 2016 1512 1101 219)
+gesture glide "$1" "$2" -- rest 1.5 -- glide "$3" "$4" -- rest 1.5
+
+# The JPEG, second in the list, its name 208 down; its gain map is shown
+# in its place too, at 654x872, the picture's shape.
+point "$list_x" $((wy + 208))
+sleep 1.0
+set -- $(pixel 3000 4000 2625 560) $(pixel 3000 4000 900 2250)
+dark_x=$3
+dark_y=$4
+about "$1" "$2"
+about "$dark_x" "$dark_y"
+point "$sun_x" "$bar_y"
+sleep 1.0
+
+# The ProRAW, third, its name under the JPEG's tall thumbnail at 425.
+point "$list_x" $((wy + 425))
+sleep 1.0
+point "$sun_x" "$bar_y"
+sleep 1.0
+set -- $(pixel 4032 3024 2178 2815) $(pixel 4032 3024 812 1756)
+gesture glide "$1" "$2" -- rest 1.5 -- glide "$3" "$4" -- rest 1.5
+film=$(cut)
+close
+shown=$(clip "$film" "gain_maps.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: the HEIC's gain map in the
+# picture's place, the pointer in its bright sky.
+poster "$shown" "gain_maps_thumb.jpg" 13.5
+# Cropped, still 16:9, to the upper right: a fifth off the bottom, and the
+# left cut to match, so that the panel is larger in the still.
+magick "$SCREENSHOTS/gain_maps_thumb.jpg" -crop 1536x864+384+0 +repage \
+    -quality 92 "$SCREENSHOTS/gain_maps_thumb.jpg"

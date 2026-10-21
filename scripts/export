@@ -20,11 +20,13 @@
 # steps to it are before the recording starts, the first of them reading a
 # 38 MB elevation model. A list of four keeps the steps and the count at
 # the head of the top bar, which a single file goes without, so the file
-# menu's button stands where the clicks below expect it; Tab puts the file
-# list away, so that the picture has the window and `fitted` finds it
-# where the four bars alone leave it. The picture is single-channel,
-# which is what false color wants; the ramp is written into the exported
-# file's pixels, so what comes back is RGB.
+# menu's button stands where the clicks below expect it. The list is
+# sorted by name, which is the order the four are given in, since the
+# order is the program's to remember between runs rather than this
+# script's to assume. Tab puts the file list away, so that the picture has
+# the window and `fitted` finds it where the four bars alone leave it. The
+# picture is single-channel, which is what false color wants; the ramp is
+# written into the exported file's pixels, so what comes back is RGB.
 #
 # The file the export writes is beside the one on screen, in the directory
 # of pictures this repository keeps. It is taken away before the take and
@@ -75,6 +77,12 @@ shown() {
     case "$(window title)" in "$1 "*) return 0 ;; *) return 1 ;; esac
 }
 
+# By name the four stand in the order they are given, so that the steps
+# land on the relief: the order is the program's to remember between runs,
+# not this script's to assume, and a run that sorted by size — gain_maps
+# does, and comes before this one in `all` — would leave the relief second
+# of the four.
+sort_by name ascending
 keep_pointer
 open 1200 675 "$@"
 keys Tab $steps

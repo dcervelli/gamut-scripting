@@ -1,0 +1,125 @@
+#!/bin/sh
+# The histogram's controls for a picture with a gain map, with the
+# display in HDR: the phone's photo in a 1200x675 window (16:9), left a moment on
+# its own, then the histogram button in the right strip pressed, the eye in
+# the Gain map section's header pressed to put the map in the picture's
+# place and pressed again to take it off, the Exposure slider's handle
+# dragged up, the curve switched from Clip to Roll off to bring the
+# highlights it pushed over white back under it, back to Clip, the reset
+# button in the panel's header pressed, and the HDR switch in the status bar pressed to turn HDR off.
+#
+# The monitor the window opens on is put into HDR for the run, with a
+# monitor rule given through the Lua API, and put back as it was when the
+# script ends, however it ends. `hyprctl keyword monitor` will not do:
+# under a Lua config it says "keyword can't work with non-legacy parsers"
+# and exits 0 with nothing changed. It is not put back with `hyprctl
+# reload`, which would also reset the scale. The film itself is SDR, as
+# every other film here is: it is of the controls.
+#
+# The pointer is in the film, since the panel is worked by pointing at it,
+# and it moves as a hand would, through device.py.
+#
+#   scripts/histogram_hdr                  on images/curated_info.heic
+#   scripts/histogram_hdr FILE             on another file
+
+. "$(dirname "$0")/../lib.sh"
+
+file=${1:-$ROOT/images/curated_info.heic}
+
+# The focused monitor, which `open` centers the window on, as the fields
+# of the rule `hl.monitor` takes: name, mode, position and scale.
+monitor=$(hyprctl monitors -j | jq -r '.[] | select(.focused) |
+    "output = \"\(.name)\", mode = \"\(.width)x\(.height)@\(.refreshRate * 1000 | round / 1000)\", position = \"\(.x)x\(.y)\", scale = \(.scale)"')
+
+# The rule, and a wait until the monitor reports the preset asked for: the
+# mode change blanks it for a moment.
+color() {
+    hyprctl eval "hl.monitor({ $monitor, bitdepth = $1, cm = \"$2\" })" >/dev/null
+    for _ in $(seq 30); do
+        hyprctl monitors -j | jq -e --arg cm "$2" '.[] | select(.focused) |
+            .colorManagementPreset == $cm' >/dev/null && return
+        sleep 0.1
+    done
+    echo "the monitor would not go to $2" >&2
+    exit 1
+}
+trap 'cleanup; color 8 srgb' EXIT
+color 10 hdr
+# Long enough for the monitor to come back from the blank.
+sleep 1.5
+
+open 1200 675 "$file"
+keep_pointer
+
+record "histogram_hdr.mp4" cursor
+started=$(since_record)
+# The picture on its own before anything is pointed at.
+sleep 1.5
+
+set -- $(window geometry)
+# The histogram toggle is the first button of the right strip: centered
+# across the strip, a bar's padding under the top bar.
+glide $(($1 + $3 - 15)) $(($2 + 45))
+sleep 0.5
+click
+# Long enough to take in the panel.
+sleep 1.5
+
+# The eye at the end of the Gain map section's header: lit while the map
+# is in the picture's place.
+glide $(($1 + $3 - 60)) $(($2 + 457))
+sleep 0.4
+click
+sleep 2.0
+click
+sleep 1.0
+
+# The Exposure slider's handle, at 0 in the middle of its track, dragged
+# up by about a stop and a quarter, so that the Display plot's line runs over
+# white well before the right end.
+exposure_x=$(($1 + $3 - 171))
+exposure_y=$(($2 + 398))
+glide "$exposure_x" "$exposure_y"
+sleep 0.3
+drag_to $((exposure_x + 16)) "$exposure_y"
+sleep 1.2
+
+# The curve's two buttons, under the slider: Roll off bends the line under
+# white instead of cutting it there.
+curve_y=$(($2 + 425))
+glide $(($1 + $3 - 100)) "$curve_y"
+sleep 0.3
+click
+sleep 2.0
+glide $(($1 + $3 - 202)) "$curve_y"
+sleep 0.3
+click
+sleep 1.5
+
+# The reset button, the second of the two at the right end of the panel's
+# header row: the exposure back to 0.
+glide $(($1 + $3 - 50)) $(($2 + 50))
+sleep 0.4
+click
+sleep 1.5
+
+# The HDR switch at the right end of the status bar, lit while the window
+# is drawn on an HDR surface: pressed, the picture goes back to SDR, held
+# at white, and the scales over white go.
+glide $(($1 + $3 - 26)) $(($2 + $4 - 15))
+sleep 0.4
+click
+sleep 2.0
+film=$(cut)
+close
+color 8 srgb
+shown=$(clip "$film" "histogram_hdr.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: exposure just brought up, the
+# pointer still on the handle with its tooltip up.
+poster "$shown" "histogram_hdr_thumb.jpg" 13
+# Cropped, still 16:9, to the upper right three quarters of the width and
+# height, down to just under the tooltip, so the panel is larger in the
+# still.
+magick "$SCREENSHOTS/histogram_hdr_thumb.jpg" -crop 1440x810+480+0 +repage \
+    -quality 92 "$SCREENSHOTS/histogram_hdr_thumb.jpg"

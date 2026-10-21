@@ -1,0 +1,120 @@
+#!/bin/sh
+# The histogram on data: three rasters of the mountain on one 12.5 m grid —
+# the hillshade, the orthophoto and the slope in degrees — opened together
+# in a 1200x675 window (16:9), on the slope. The histogram button in the
+# right strip pressed, the turbo swatch under its Display band clicked, the
+# wheel's pointer taken to the summit and `1` pressed for 100% about it,
+# and the picture dragged to bring the summit to the middle of the view.
+# Then the band's black handle dragged to a slope of 30° and its white one
+# to 45°, and the file list stepped through once, hillshade and orthophoto
+# and back to the slope: the three are the same size, so the view carries
+# over and the summit stays where it is while the data under it changes.
+# The pointer is in the film, since where it goes is the point, and it
+# moves as a hand would, through device.py.
+#
+#   scripts/data_histogram
+
+. "$(dirname "$0")/../lib.sh"
+
+M=$ROOT/images/mora
+# The summit, Columbia Crest, as a pixel of the grid: the highest of the
+# DEM's, 4383 m.
+W=4400
+H=3760
+SUMMIT_X=2361
+SUMMIT_Y=2356
+# The slope's band, which is linear, and the two it is set to. Its ends
+# are 0.082° and 83.30°, as measured off where a handle dragged to a
+# given place reads, not the raster's own 0° and 83.58°.
+LEAST=0.082
+MOST=83.30
+BLACK=30
+WHITE=45
+
+# By name the three are the hillshade, the orthophoto and the slope, so the
+# slope is the last of the list and one Up from the first.
+sort_by name ascending
+open 1200 675 "$M/mora_hillshade_12.5m.tif" "$M/mora_ortho.tif" "$M/mora_slope.tif"
+keep_pointer
+keys Up
+loaded
+sleep 0.5
+
+record "data_histogram.mp4" cursor
+started=$(since_record)
+sleep 1.0
+
+set -- $(window geometry)
+wx=$1
+wy=$2
+ww=$3
+wh=$4
+# The histogram toggle is the first button of the right strip: centered
+# across the strip, a bar's padding under the top bar.
+glide $((wx + ww - 15)) $((wy + 45))
+sleep 0.5
+click
+sleep 1.0
+
+# The swatches stand in a row under the Display section's band, which is
+# 256 wide with its right end 54 in from the window's right edge: four of
+# 64 across it, gray first, turbo last with its middle 86 in.
+glide $((wx + ww - 86)) $((wy + 392))
+sleep 0.5
+click
+sleep 1.5
+
+# The file list and its tool strip take 162.5 off the left of the
+# picture's area, and the panel 292.5 off its right. `1` is 100%, and
+# holds the pixel under the pointer where it is.
+set -- $(fitted "$W" "$H" "$SUMMIT_X" "$SUMMIT_Y" 162.5 292.5)
+glide "$1" "$2"
+sleep 0.8
+press 1
+sleep 1.2
+# The picture dragged by the summit to the middle of the view. The drag
+# is 25 left and 74 up, and comes up short of the up by 7, as a drag does
+# (see `slack` in scripts/region) but not of the left: both measured off
+# the readout at the middle of the view afterwards.
+cx=$((wx + 30 + 163 + 685 / 2))
+cy=$((wy + 30 + 615 / 2))
+drag_to $((cx + 1)) $((cy - 7))
+sleep 1.5
+
+# The band's handles, which stand on it 358 down, along its 256 from 310
+# in at its least to 54 in at its most. The white starts at what the
+# trimmed window ends on, 66.688°. Each is dragged to where its value
+# stands and held there long enough for the value written above the plot
+# to be read.
+band_y=$((wy + 358))
+along() {
+    awk -v right="$((wx + ww))" -v v="$1" -v least="$LEAST" -v most="$MOST" \
+        'BEGIN { printf "%.2f\n", right - 310 + 256 * (v - least) / (most - least) }'
+}
+glide "$(along "$LEAST")" "$band_y"
+sleep 0.5
+drag_to "$(along "$BLACK")" "$band_y" placed
+sleep 1.5
+glide "$(along 66.688)" "$band_y"
+sleep 0.5
+drag_to "$(along "$WHITE")" "$band_y" placed
+sleep 1.5
+
+# Off the panel and onto the summit, now in the middle of the view, so
+# that the readout below follows the data under it through the steps.
+glide "$cx" "$cy"
+sleep 2.0
+# Down the list and around: the hillshade, the orthophoto, the slope.
+for _ in 1 2 3; do
+    keys Down
+    loaded
+    sleep 2.5
+done
+sleep 0.5
+film=$(cut)
+close
+shown=$(clip "$film" "data_histogram.mp4" "$started")
+echo "$shown"
+# The still that stands in for the film: back on the slope at the end,
+# turbo over 30° to 45° around the summit, the pointer on it.
+poster "$shown" "data_histogram_thumb.jpg" 30.5
