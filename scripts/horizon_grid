@@ -114,6 +114,6 @@ film=$(cut)
 close
 shown=$(clip "$film" "horizon_grid.mp4" "$started")
 echo "$shown"
-# The still that stands in for the film: the grid over the zoomed sky, the
-# upright through the pointer down the tower's edge, the moon above.
-poster "$shown" "horizon_grid_thumb.jpg" 23
+# The still that stands in for the film: the grid laid over the whole capitol,
+# the horizon line through the bollards marked off in bearings, the moon above.
+poster "$shown" "horizon_grid_thumb.jpg" 17.916
